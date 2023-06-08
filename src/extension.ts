@@ -10,25 +10,26 @@ import {
   config_ids,
   config_default,
 } from "./global";
-import { randomInt } from "crypto";
 import {
   dirRead,
   ensure,
   fileCopy,
   fileExisted,
+  fileRead,
   fileRemove,
   fileRename,
+  fileWrite,
   getDirPath,
   getDisplayFilename,
   getFilename,
   getNonce,
   initDir,
+  randomInArray,
   replaceAll,
   shuffleArray,
 } from "./utils";
 import { error } from "console";
 import { CommonPickItem, MultiStepInput } from "./multistepHelper";
-import { config } from "process";
 
 let workbenchPath: string | undefined;
 
@@ -51,31 +52,24 @@ let updateConfigTimer: NodeJS.Timeout | undefined;
 
 let context: vscode.ExtensionContext;
 
+let bakExisted: boolean;
 let oriExisted: boolean;
 
 // 用来控制回调是否生效
 // let loaderMainPromise: Promise<boolean> | undefined
 
-// 不要置为全局，因为用户会更改,即拿即用
-// let configObj: vscode.WorkspaceConfiguration
-// 这里是为了拿到用户更改前的configObj，只针对几个判定配置
-let lastConfigObj: vscode.WorkspaceConfiguration;
-
 // 只有reloadWindow之后才会改
-let curMainRecord: MainEntity | null = null;
+let curMainEntity: MainEntity | null = null;
 
 // 禁用状态下只能做一个操作：启用
 
 export async function activate(_context: vscode.ExtensionContext) {
-
-  console.log("activate...");
-
   // 启动配置
   if (!workbenchPath) {
     const appRoot = vscode.env.appRoot;
     workbenchPath = path.join(appRoot, "out", "vs", "workbench");
   }
-  makePath(workbenchPath);
+  formatPath(workbenchPath);
   // 如果这个文件不存在，表示当前插件已经没有用了，直接报错即可
   try {
     ensure(await fileExisted(mainCSSPath));
@@ -88,10 +82,6 @@ export async function activate(_context: vscode.ExtensionContext) {
 
   context = _context;
   extensionUri = context.extensionUri;
-  lastConfigObj = vscode.workspace.getConfiguration();
-
-  // context.globalState.update(global_keys.IS_INNER, undefined);
-  // context.globalState.update(global_keys.BG_NAME, undefined);
 
   ensure(await initDir(innerDir));
   ensure(await initDir(userDir));
@@ -99,34 +89,26 @@ export async function activate(_context: vscode.ExtensionContext) {
   // 禁用情况下的注册
   context.subscriptions.push(
     vscode.commands.registerCommand(command_ids.DISABLE_EXT, async () => {
-      const configObj = vscode.workspace.getConfiguration();
-      if (configObj.get<boolean>(config_ids.ENABLED)) {
-        vscode.window
-          .showInformationMessage("确定禁用壁纸加载器吗？", "确定", "取消")
-          .then(async (res) => {
-            if (res === "确定") {
-              await onDisable();
-              reloadWindow();
-            }
-          });
+      if (!extEnabled()) {
+        await onDisable();
+        reloadWindow();
       }
     }),
     vscode.commands.registerCommand(command_ids.ENABLE_EXT, async () => {
-      const configObj = vscode.workspace.getConfiguration();
-      configObj
-        .update(config_ids.ENABLED, true, vscode.ConfigurationTarget.Global)
-        .then(() => {
+      if (extEnabled()) {
+        updateConfig(config_ids.ENABLED, true).then(() => {
           loaderMain();
         });
+      }
     }),
     vscode.commands.registerCommand(command_ids.OPEN_USER_DIR, () => {
       checkEnabledAndTip();
       vscode.env.openExternal(vscode.Uri.file(userDir));
     }),
-    vscode.commands.registerCommand(command_ids.Config_BG_LOADER, () => {
-      configBGLoader();
+    vscode.commands.registerCommand(command_ids.CONFIG_LOADER, () => {
+      configLoader();
     }),
-    vscode.commands.registerCommand(command_ids.REFRESH_BG, async () => {
+    vscode.commands.registerCommand(command_ids.REFRESH_PAPER, async () => {
       // 禁用下不可用
       if (!extEnabled()) {
         vscode.window
@@ -137,7 +119,7 @@ export async function activate(_context: vscode.ExtensionContext) {
           )
           .then((res) => {
             if (res === "确定") {
-              vscode.commands.executeCommand(command_ids.ENABLE_EXT);
+              enable();
             }
           });
         return;
@@ -147,7 +129,7 @@ export async function activate(_context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(
           `当前壁纸每${vscode.workspace
             .getConfiguration()
-            .get(config_ids.ZOOM_CIRCLE)}秒就会切换一次哦！`
+            .get(config_ids.SWITCH_CYCLE)}秒就会切换一次哦！`
         );
         return;
       }
@@ -177,25 +159,15 @@ export async function activate(_context: vscode.ExtensionContext) {
           console.log("修改style配置");
           // 重新读取配置
           const configObj = vscode.workspace.getConfiguration();
-          // const curMainRecord = await readCur()
-          // const success = await refreshMain(curMainRecord, configObj)
-          // let success = true;
-          // if (configObj.get<boolean>(config_ids.AUTO_REFRESH)) {
-          //   // 修改配置就是为了看当前的，所以recover
-          //   success = await recover();
-          // } else {
-          //   const curMainObj = await readCur();
-          //   if (curMainObj) {
-          //     success = await writeMain(curMainObj,configObj);
-          //   }
-          // }
 
           await recover();
-          const curMainObj = await readCur();
-          if (curMainObj) {
-            const success = await writeMain(curMainObj, configObj);
+          const curMain = await readCur();
+          if (curMain) {
+            const success = await writeMain(curMain, configObj);
             if (success) {
-              showInfoBeforeReload("修改后需要重启vscode,现在重启吗?");
+              showInfoBeforeReload(
+                "修改后需要重启vscode,现在重启吗?"
+              );
             }
           }
         }, 100);
@@ -214,124 +186,101 @@ export async function activate(_context: vscode.ExtensionContext) {
         }
       } else if (event.affectsConfiguration(config_ids.ENABLED)) {
         if (getConfig<boolean>(config_ids.ENABLED)) {
-          vscode.commands.executeCommand(command_ids.ENABLE_EXT);
+          enable();
         } else {
-          vscode.commands.executeCommand(command_ids.DISABLE_EXT);
+          vscode.window
+            .showInformationMessage(
+              "你确定要禁用壁纸加载器吗？",
+              "确定",
+              "取消"
+            )
+            .then((res) => {
+              if (res === "确定") {
+                onDisable();
+              } else {
+                updateConfig(config_ids.ENABLED, true);
+              }
+            });
         }
       }
     })
   );
+
   const statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left
   );
   statusBarItem.text = `$(octoface) ${PLUGIN_CN_NAME}`;
-  statusBarItem.command = command_ids.Config_BG_LOADER;
+  statusBarItem.command = command_ids.CONFIG_LOADER;
   statusBarItem.show();
 
+  bakExisted = await fileExisted(mainCSSBakPath);
   oriExisted = await fileExisted(mainCSSOriPath);
   const configObj = vscode.workspace.getConfiguration();
-  if (!configObj.get<boolean>(config_ids.ENABLED)) {
-    console.log("被禁用了");
-    // 定义一个概念，从插件下载了那一刻开始，我们就完成了从禁用到启动，默认是启动，所以要完成禁用->启动
+  if (extEnabled()) {
+    await loaderMain();
+  } else {
+    if (oriExisted) {
+      // 禁用下却存在，直接force掉
 
-    // if (oriExisted) {
-    // 	// 被禁用下居然还存在，这是不对的，直接禁用
-    // 	onDisable()
-    // }
-    return;
+      disable();
+    }
   }
 
-  await loaderMain();
-
-  // 非禁用情况下的注册
-  // context.subscriptions.push(
-  // vscode.commands.registerCommand(command_ids.FIX_BG, async () => {
-  //   // 固定当前的壁纸
-  //   const mainObj = await readCur();
-  //   if (!mainObj) {
-  //     console.error("fix fail");
-  //     return;
-  //   }
-  //   configObj
-  //     .update(
-  //       config_ids.AUTO_REFRESH,
-  //       false,
-  //       vscode.ConfigurationTarget.Global
-  //     )
-  //     .then(() => {
-  //       console.log("将auto-refresh设置为false");
-  //     });
-
-  //   await writeMain(mainObj, configObj);
-  //   console.log("fix success");
-  // }),
-  // vscode.commands.registerCommand(command_ids.AUTO_REFRESH_BG, async () => {
-  //   // 这两个顺序不能交换
-  //   vscode.commands.executeCommand(command_ids.REFRESH_BG);
-  //   configObj
-  //     .update(
-  //       config_ids.AUTO_REFRESH,
-  //       true,
-  //       vscode.ConfigurationTarget.Global
-  //     )
-  //     .then(() => {
-  //       console.log("将auto-refresh设置为true");
-  //     });
-  // })
-  // );
   console.log("完成");
 }
 
 async function loaderMain() {
   // 查找vscode的位置
-  // 先读配置
-  const configObj = vscode.workspace.getConfiguration();
 
   const existedRemoved = await fileExisted(mainCSSRemovedPath);
   if (existedRemoved) {
-    ensure(await fileRemove(mainCSSRemovedPath));
+    // ensure(await fileRemove(mainCSSRemovedPath));
+    ensure(await fileRename(mainCSSRemovedPath, mainCSSOriPath));
   }
 
   // oriExisted可以判断初见是否被加载
   // 杜绝双重判断！
   if (!oriExisted) {
-    // 没有应用插件，为了防止意外，不要重命名为备份，新建一个文件
+    // 没有初始化过插件，为了防止意外，不要重命名为备份，新建一个文件
+    // 这个方式可行
+
+    // if (bakExisted) {
+    //   ensure(await fileCopy(mainCSSBakPath, mainCSSOriPath));
+    // } else {
+    //   ensure(await fileCopy(mainCSSPath, mainCSSBakPath));
+    //   ensure(await fileCopy(mainCSSPath, mainCSSOriPath));
+    // }
+
     ensure(await fileCopy(mainCSSPath, mainCSSOriPath));
+
+    // 以下不可行
+    // const rawMain = await fileRead(mainCSSPath);
+    // await fileWrite(mainCSSOriPath, rawMain);
+    // if(!bakExisted){
+    //   await fileWrite(mainCSSBakPath, rawMain);
+    // }
   }
 
-  curMainRecord = await readMain();
-
-  // 读出来的时候，是当前的bgName，之后如果自刷新，就会修改
-  // if (curMainRecord) {
-  //   context.globalState.update(global_keys.IS_INNER, curMainRecord.isInner);
-  //   context.globalState.update(global_keys.BG_NAME, curMainRecord.bgName);
-  // }
+  curMainEntity = await readMain();
 
   // switch模式
   if (isSwitchModel()) {
     await refreshMain({ useSwitch: true });
     if (!oriExisted) reloadWindow();
   } else {
-    if (!oriExisted || configObj.get<boolean>(config_ids.AUTO_REFRESH, true)) {
-      await refreshMain(curMainRecord, configObj);
+    const configObj = vscode.workspace.getConfiguration();
+    if (
+      !oriExisted ||
+      configObj.get<boolean>(config_ids.AUTO_REFRESH, true) ||
+      context.globalState.get<boolean>(global_keys.STYLE_UPDATE)
+    ) {
+      await refreshMain(curMainEntity, configObj);
       if (!oriExisted) reloadWindow();
     }
   }
-
-  //
-  //   if (!oriExisted) {
-  //     // 初次使用
-  //     await refreshMain(curMainRecord, configObj);
-  //     reloadWindow();
-  //     // context.globalState.update(global_keys.INITTED, true)
-  //   } else if (configObj.get<boolean>(config_ids.AUTO_REFRESH, true)) {
-  //     // 自刷新
-  //     await refreshMain(curMainRecord, configObj);
-  //   }
-  //   return;
 }
 
-function configBGLoader() {
+function configLoader() {
   MultiStepInput.run(async (input) => {
     let i = 0;
     const configObj = vscode.workspace.getConfiguration();
@@ -358,10 +307,10 @@ function configBGLoader() {
         vscode.commands.executeCommand(command_ids.OPEN_USER_DIR);
         break;
       case 1:
-        vscode.commands.executeCommand(command_ids.REFRESH_BG);
+        vscode.commands.executeCommand(command_ids.REFRESH_PAPER);
         break;
       case 2:
-        showBGLoaderView();
+        showLoaderView();
         break;
       case 3:
         vscode.commands.executeCommand(
@@ -372,20 +321,20 @@ function configBGLoader() {
       case 4:
         if (configObj.get<boolean>(config_ids.ENABLED)) {
           // 启用->禁用
-          vscode.commands.executeCommand(command_ids.DISABLE_EXT);
+          disable();
         } else {
-          vscode.commands.executeCommand(command_ids.ENABLE_EXT);
+          enable();
         }
         break;
     }
   });
 }
-async function showBGLoaderView() {
-  const availableBGs = await getAvailableBGs();
+async function showLoaderView() {
+  const availablePapers = await getAvailablePapers();
 
   const panel = vscode.window.createWebviewPanel(
-    "bgManagerPanel",
-    availableBGs.isInner ? "内置壁纸" : "我的壁纸",
+    "WallPaperManagerPanel",
+    availablePapers.isInner ? "内置壁纸" : "我的壁纸",
     vscode.ViewColumn.One,
     {
       enableScripts: true,
@@ -396,15 +345,16 @@ async function showBGLoaderView() {
       ],
     }
   );
-  panel.webview.html = await getWebviewContent(panel.webview, availableBGs);
+  panel.webview.html = await getWebviewContent(panel.webview, availablePapers);
   panel.webview.onDidReceiveMessage(async (message) => {
     // 根据消息类型执行对应操作
     const payload = message.payload;
     switch (message.type) {
-      case "msg":
-        console.log(payload);
-        break;
-      case "bgSelected": {
+      // for dubug
+      // case "msg":
+      //   console.log(payload);
+      //   break;
+      case "selected": {
         const configObj = vscode.workspace.getConfiguration();
         if (configObj.get(config_ids.USE_SWITICH_ANIMATION)) {
           vscode.window
@@ -418,7 +368,7 @@ async function showBGLoaderView() {
                 await writeMain({
                   useSwitch: false,
                   paperInfo: {
-                    isInner: availableBGs.isInner,
+                    isInner: availablePapers.isInner,
                     fileName: payload,
                   },
                 });
@@ -432,17 +382,17 @@ async function showBGLoaderView() {
         } else {
           await writeMain({
             useSwitch: false,
-            paperInfo: { isInner: availableBGs.isInner, fileName: payload },
+            paperInfo: { isInner: availablePapers.isInner, fileName: payload },
           });
           reloadWindow();
         }
 
         break;
       }
-      case "bgBanned": {
+      case "banned": {
         // TODO 禁用或者删除之后，要看看是不是当前的壁纸，以及保证下一次启动的壁纸
         const realPath = path.join(
-          availableBGs.isInner ? innerDir : userDir,
+          availablePapers.isInner ? innerDir : userDir,
           payload
         );
         console.log("想要禁用的文件是：", realPath);
@@ -465,12 +415,14 @@ async function showBGLoaderView() {
               .then((res) => {
                 if (res === "只禁用，不删除") {
                   useRemove = false;
-                  updateConfig(config_ids.USE_REMOVE, useRemove).then(()=>{f1(true);});
-                  
+                  updateConfig(config_ids.USE_REMOVE, useRemove).then(() => {
+                    f1(true);
+                  });
                 } else {
-
                   useRemove = true;
-                  updateConfig(config_ids.USE_REMOVE, useRemove).then(()=>{f1(true)})
+                  updateConfig(config_ids.USE_REMOVE, useRemove).then(() => {
+                    f1(true);
+                  });
                 }
               });
           });
@@ -481,87 +433,66 @@ async function showBGLoaderView() {
           await fileRemove(realPath);
         } else {
           await filePathAddRemoved(realPath);
-          availableBGs.removedFiles.push(`removed-${payload}`);
+          availablePapers.removedFiles.push(`removed-${payload}`);
         }
-        availableBGs.bgFiles = availableBGs.bgFiles.filter(
+        availablePapers.files = availablePapers.files.filter(
           (file) => file !== payload
         );
 
         // 刷新
         panel.webview.html = await getWebviewContent(
           panel.webview,
-          availableBGs
+          availablePapers
         );
 
-        // 检查，如果用的是main当中的，就刷掉，以防下一次还用
-        // 但如果是当前的，那就不换
-        // const mainObj = await readMain();
-        // if (
-        //   mainObj &&
-        //   availableBGs.isInner === mainObj.isInner &&
-        //   payload === mainObj.bgName
-        // ) {
-        //   await refreshMain(null);
-        // }
-
         checkRemovedAndRefresh({
-          isInner: availableBGs.isInner,
+          isInner: availablePapers.isInner,
           fileName: payload,
         });
 
         break;
       }
-      case "bgRemoved": {
+      case "removed": {
         const realPath = path.join(
-          availableBGs.isInner ? innerDir : userDir,
+          availablePapers.isInner ? innerDir : userDir,
           payload
         );
         await fileRemove(realPath);
 
         // 检查
-        availableBGs.bgFiles = availableBGs.bgFiles.filter(
+        availablePapers.files = availablePapers.files.filter(
           (file) => file !== payload
         );
-        availableBGs.removedFiles = availableBGs.removedFiles.filter(
+        availablePapers.removedFiles = availablePapers.removedFiles.filter(
           (file) => file !== payload
         );
         panel.webview.html = await getWebviewContent(
           panel.webview,
-          availableBGs
+          availablePapers
         );
 
-        // 检查
-        // const mainObj = await readMain();
-        // if (
-        //   mainObj &&
-        //   availableBGs.isInner === mainObj.isInner &&
-        //   payload === mainObj.bgName
-        // ) {
-        //   await refreshMain(null);
-        // }
-
         checkRemovedAndRefresh({
-          isInner: availableBGs.isInner,
+          isInner: availablePapers.isInner,
           fileName: payload,
         });
 
         break;
       }
-      case "bgStartup":
+      case "startup":
         console.log(`重新启用:${payload}`);
 
         await filePathCleanRemoved(
-          path.join(availableBGs.isInner ? innerDir : userDir, payload)
+          path.join(availablePapers.isInner ? innerDir : userDir, payload)
         );
 
-        availableBGs.bgFiles.push((<string>payload).replace("removed-", ""));
-        availableBGs.removedFiles = availableBGs.removedFiles.filter(
+        availablePapers.files.push((<string>payload).replace("removed-", ""));
+        availablePapers.removedFiles = availablePapers.removedFiles.filter(
           (file) => file !== payload
         );
 
         panel.webview.html = await getWebviewContent(
           panel.webview,
-          availableBGs
+          availablePapers
         );
 
         break;
@@ -572,40 +503,28 @@ async function showBGLoaderView() {
 
 // 当某个文件删除的时候，是否需要更改style
 async function checkRemovedAndRefresh(paperInfo: PaperInfo) {
-  const mainObj = await readMain();
-  if (!mainObj) return;
+  const mainEntity = await readMain();
+  if (!mainEntity) return;
 
   if (
-    !mainObj.useSwitch &&
-    mainObj.paperInfo!.isInner === paperInfo.isInner &&
-    mainObj.paperInfo!.fileName === paperInfo.fileName
+    !mainEntity.useSwitch &&
+    mainEntity.paperInfo!.isInner === paperInfo.isInner &&
+    mainEntity.paperInfo!.fileName === paperInfo.fileName
   ) {
     await refreshMain({ useSwitch: false, paperInfo });
-  } else if (mainObj.useSwitch) {
+  } else if (mainEntity.useSwitch) {
     await refreshMain({ useSwitch: true });
   }
-
-  // if (
-  //   mainObj &&
-  //   mainObj.isInner === removedObj.isInner &&
-  //   mainObj.bgName === removedObj.bgName
-  // ) {
-  //   await refreshMain(null);
-  // }
 }
 
-type AvailableBGs = {
+type AvailablePapers = {
   isInner: boolean;
-  bgFiles: string[];
+  files: string[];
   removedFiles: string[];
 };
 
 // 非switch下main中写回当前应用的bg
 async function recover() {
-  // const mainObj = await readCur();
-  // if (mainObj) {
-  //   return await writeMain(mainObj);
-  // }
   const mainEntity = await readCur();
 
   if (mainEntity && !mainEntity.useSwitch) {
@@ -615,51 +534,51 @@ async function recover() {
   return true;
 }
 
-async function getAvailableBGs() {
+async function getAvailablePapers() {
   let files = await dirRead(userDir);
   if (!files || files.length === 0) {
     // 使用内置
-    await initInnerBGs();
+    await initInnerPapers();
     files = await dirRead(innerDir);
     const [bgFiles, removedFiles] = filterRemoved(files);
     return {
       isInner: true,
-      bgFiles: bgFiles,
+      files: bgFiles,
       removedFiles: removedFiles,
-    } as AvailableBGs;
+    } as AvailablePapers;
   } else {
     const [bgFiles, removedFiles] = filterRemoved(files);
     return {
       isInner: false,
-      bgFiles: bgFiles,
+      files: bgFiles,
       removedFiles: removedFiles,
-    } as AvailableBGs;
+    } as AvailablePapers;
   }
 }
 
 async function getWebviewContent(
   webview: vscode.Webview,
-  availableBGs: AvailableBGs
+  availablePapers: AvailablePapers
 ) {
   const prefix = path.join(
     workbenchPath!,
     "loader",
-    availableBGs.isInner ? "inner" : "user"
+    availablePapers.isInner ? "inner" : "user"
   );
 
-  const itemsContent = availableBGs.bgFiles
+  const itemsContent = availablePapers.files
     .map((file) => {
       const uri = webview.asWebviewUri(
         vscode.Uri.file(path.join(prefix, file))
       );
       // 防止文件名太长
-      return `<div class="wallpaper-item" data-path="${file}"><img src="${uri}" data-path="${file}"/><div>${getDisplayFilename(
+      return `<div class="wallpaper-item" data-path="${file}"><img class="usable" src="${uri}" data-path="${file}"/><div>${getDisplayFilename(
         file
       )}</div></div>`;
     })
     .join("");
 
-  const removedItemsContent = availableBGs.removedFiles
+  const removedItemsContent = availablePapers.removedFiles
     .map((file) => {
       const uri = webview.asWebviewUri(
         vscode.Uri.file(path.join(prefix, file))
@@ -750,7 +669,7 @@ async function getWebviewContent(
 		<ul>
 		  ${
         // inner壁纸不能删除
-        availableBGs.isInner
+        availablePapers.isInner
           ? "<li id='select'>应用该壁纸</li><li>注：内置壁纸不能禁用</li>"
           : "<li id='select'>应用该壁纸</li><li id='ban'>禁用该壁纸</li>"
       }
@@ -773,63 +692,54 @@ async function getWebviewContent(
 // 排除curMainRecord中的内容进行写入
 // 如果是null就表示随便刷一张，只要刷就行
 async function refreshMain(
-  curMainRecord: MainEntity | null,
+  curMainEntity: MainEntity | null,
   configObj: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration()
 ) {
   return new Promise<boolean>(async (f1, f2) => {
-    if (!curMainRecord) {
-      // 强刷
-      // 在这里造一个mainEntity
-      const useSwitch = vscode.workspace
-        .getConfiguration()
-        .get(config_ids.USE_SWITICH_ANIMATION);
-      if (useSwitch) {
-        f1(await writeMain({ useSwitch: true }));
-        return;
-      } else {
-        const availableBGs = await getAvailableBGs();
-        const index = randomInt(availableBGs.bgFiles.length);
-        const selectedBG = availableBGs.bgFiles[index];
-        f1(
-          await writeMain(
-            {
-              useSwitch: false,
-              paperInfo: {
-                isInner: availableBGs.isInner,
-                fileName: selectedBG,
-              },
-            },
-            configObj
-          )
-        );
-      }
-      return;
-    }
-    if (curMainRecord.useSwitch) {
-      // 强刷
-      f1(await writeMain(curMainRecord));
+    if (isSwitchModel()) {
+      f1(await writeMain({ useSwitch: true }));
       return;
     }
 
-    // 过滤removed
-    const availableBGs = await getAvailableBGs();
+    // 非switch
+    if (!curMainEntity) {
+      const availablePapers = await getAvailablePapers();
+      const selectedBG = randomInArray(availablePapers.files);
+      f1(
+        await writeMain(
+          {
+            useSwitch: false,
+            paperInfo: {
+              isInner: availablePapers.isInner,
+              fileName: selectedBG,
+            },
+          },
+          configObj
+        )
+      );
+      return;
+    }
+
+    const availablePapers = await getAvailablePapers();
     // 排除当前的
     if (
-      curMainRecord!.paperInfo &&
-      availableBGs.isInner === curMainRecord.paperInfo.isInner
-    )
-      availableBGs.bgFiles = availableBGs.bgFiles.filter(
-        (file) => file !== curMainRecord.paperInfo!.fileName
+      curMainEntity!.paperInfo &&
+      availablePapers.isInner === curMainEntity.paperInfo.isInner
+    ) {
+      availablePapers.files = availablePapers.files.filter(
+        (file) => file !== curMainEntity.paperInfo!.fileName
       );
+    }
 
-    const index = randomInt(availableBGs.bgFiles.length);
-    const selectedBG = availableBGs.bgFiles[index];
-
+    const selectedFile = randomInArray(availablePapers.files);
     f1(
       await writeMain(
         {
           useSwitch: false,
-          paperInfo: { isInner: availableBGs.isInner, fileName: selectedBG },
+          paperInfo: {
+            isInner: availablePapers.isInner,
+            fileName: selectedFile,
+          },
         },
         configObj
       )
@@ -837,26 +747,27 @@ async function refreshMain(
   });
 }
 
-// 现在开始，不区分style和Path了，直接更改main
-// 单纯写入mainObj的内容或者被安排使用switch
+// 单纯写入mainEntity的内容或者被安排使用switch
 async function writeMain(
-  mainObj: MainEntity,
+  mainEntity: MainEntity,
   configObj: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration()
 ) {
   return new Promise<boolean>(async (f1, f2) => {
-    // let useSwitchAni = configObj.get<boolean>(config_ids.USE_SWITICH_ANIMATION);
-    let useSwitchAni = mainObj.useSwitch;
+    let useSwitchAni = mainEntity.useSwitch;
 
     let useZoomAni = configObj.get<boolean>(config_ids.USE_ZOOM_ANIMATION);
 
-    let bgPath = "";
-    if (!useSwitchAni) bgPath = getCSSBGPath(mainObj.paperInfo!);
-    // 检查一下bgPath是否存在
-    const realPath = path.join(workbenchPath!, bgPath);
-    if (!(await fileExisted(realPath))) {
-      f2("壁纸文件不存在！");
-      return;
+    let paperPath = "";
+    if (!useSwitchAni) {
+      paperPath = getCSSPaperPath(mainEntity.paperInfo!);
+      // 检查一下bgPath是否存在
+      const realPath = path.join(workbenchPath!, paperPath);
+      if (!(await fileExisted(realPath))) {
+        f2("壁纸文件不存在！");
+        return;
+      }
     }
+
     // 添加了switch相关
     let zoomDef = "";
     let switchDef = "";
@@ -867,8 +778,8 @@ async function writeMain(
         // animationTemplate
         {
           animationTemplate += `zoom ${configObj.get<number>(
-            config_ids.ZOOM_CIRCLE,
-            config_default.ZOOM_CIRCLE
+            config_ids.ZOOM_CYCLE,
+            config_default.ZOOM_CYCLE
           )}s infinite ease-in-out`;
           if (useSwitchAni) {
             animationTemplate += ",";
@@ -886,31 +797,30 @@ async function writeMain(
       }
       if (useSwitchAni) {
         {
-          let switchCircle: number = 0;
           if (useSwitchAni) {
-            const availableBGs = await getAvailableBGs();
-            const length = availableBGs.bgFiles.length;
+            const availablePapers = await getAvailablePapers();
+            const length = availablePapers.files.length;
             // animationTemplate
             {
-              switchCircle = configObj.get<number>(
-                config_ids.SWITCH_CIRCLE,
-                config_default.SWITCH_CIECLE
+              let switchCycle = configObj.get<number>(
+                config_ids.SWITCH_CYCLE,
+                config_default.SWITCH_CYCLE
               );
-              switchCircle = switchCircle * length;
-              animationTemplate += `switch ${switchCircle}s infinite steps(1);`;
+              switchCycle = switchCycle * length;
+              animationTemplate += `switch ${switchCycle}s infinite steps(1);`;
             }
             // switchDef
             {
               const prefix = `loader/${
-                availableBGs.isInner ? "inner" : "user"
+                availablePapers.isInner ? "inner" : "user"
               }`;
               const incre = Math.floor(100 / length);
               let curStep = 0;
               switchDef = "@keyframes switch{";
               // 打乱
-              const shuffledFiles = shuffleArray(availableBGs.bgFiles);
-              for (const bg of shuffledFiles) {
-                switchDef += `${curStep}%{background-image:url(${prefix}/${bg});}`;
+              const shuffledFiles = shuffleArray(availablePapers.files);
+              for (const file of shuffledFiles) {
+                switchDef += `${curStep}%{background-image:url(${prefix}/${file});}`;
                 curStep += incre;
               }
               switchDef += "}";
@@ -921,22 +831,15 @@ async function writeMain(
     }
     // switch下，body里面就不要写background-image了，而且有特定的switchTip标识
     let mainContent = `@import url("${mainCSSOriName}");body{${
-      useSwitchAni ? "" : `background-image:url(${bgPath});`
+      useSwitchAni ? "" : `background-image:url(${paperPath});`
     }background-repeat:no-repeat;background-position:center;background-size:cover;opacity:${configObj.get<number>(
       config_ids.OPACITY,
       config_default.OPACITY
     )};${animationTemplate}}${zoomDef}${switchDef}`;
 
-    const ws = fs.createWriteStream(mainCSSPath);
-    ws.write(mainContent, "utf-8", async (err) => {
-      if (err) {
-        console.error(err);
-        f2(err);
-      } else {
-        f1(true);
-      }
-      ws.close();
-    });
+    if (await fileWrite(mainCSSPath, mainContent).catch((err) => f2(err))) {
+      f1(true);
+    }
   });
 }
 
@@ -952,19 +855,8 @@ type MainEntity = {
 
 // 读取当前应用的壁纸
 async function readCur() {
-  if (curMainRecord) return curMainRecord;
+  if (curMainEntity) return curMainEntity;
   return await readMain();
-  // const isInner = context.globalState.get<boolean>(global_keys.IS_INNER);
-  // const bgName = context.globalState.get<string>(global_keys.BG_NAME);
-  // if (isInner !== undefined && bgName) {
-  //   return {
-  //     useSwitch: false,
-  //     paperInfo: {
-  //       isInner,
-  //       bgName,
-  //     },
-  //   } as MainEntity;
-  // } else return await readMain();
 }
 
 // 强行读取main
@@ -990,14 +882,12 @@ async function readMain() {
   }
 
   const switchMatch = content.match(switchTip);
-
   if (switchMatch) {
     return { useSwitch: true } as MainEntity;
   }
 
   const infoMatch = content.match(/:url\(loader\/(.*?)\/(.*?)\)/);
   if (!infoMatch || infoMatch.length < 3) {
-    // 没内容
     return null;
   }
 
@@ -1010,7 +900,7 @@ async function readMain() {
   } as MainEntity;
 }
 
-function makePath(workbenchPath: string) {
+function formatPath(workbenchPath: string) {
   loaderDir = path.join(workbenchPath, "loader");
   innerDir = path.join(loaderDir, "inner");
   userDir = path.join(loaderDir, "user");
@@ -1021,7 +911,7 @@ function makePath(workbenchPath: string) {
   mainCSSRemovedPath = `${mainCSSPath}-removed`;
 }
 
-async function initInnerBGs() {
+async function initInnerPapers() {
   const files = await new Promise<string[]>((resolve, reject) => {
     fs.readdir(path.join(MEDIA_DIR, "img"), (err, files) => {
       if (err) {
@@ -1085,8 +975,8 @@ async function filePathCleanRemoved(realPath: string) {
   );
 }
 
-function getCSSBGPath(mainObj: PaperInfo) {
-  return `loader/${mainObj.isInner ? "inner" : "user"}/${mainObj.fileName}`;
+function getCSSPaperPath(paperInfo: PaperInfo) {
+  return `loader/${paperInfo.isInner ? "inner" : "user"}/${paperInfo.fileName}`;
 }
 
 function reloadWindow() {
@@ -1097,79 +987,6 @@ function showInfoBeforeReload(info: string) {
   vscode.window.showInformationMessage(info, "确定", "待会").then((choice) => {
     if (choice === "确定") {
       reloadWindow();
-    }
-  });
-}
-
-// 检测输入值是否合法，现在遗弃，交给package.json
-async function checkConfigUpdate(event: vscode.ConfigurationChangeEvent) {
-  return new Promise<boolean>((f1, f2) => {
-    const configObj = vscode.workspace.getConfiguration();
-    if (event.affectsConfiguration(config_ids.OPACITY)) {
-      const curValue = configObj.get<number>(config_ids.OPACITY);
-      if (!curValue || curValue >= 1) {
-        vscode.window.showErrorMessage(
-          `${config_ids.OPACITY} settings an invalid value!`
-        );
-        configObj
-          // 改为用户原始的值
-          .update(
-            config_ids.OPACITY,
-            lastConfigObj,
-            vscode.ConfigurationTarget.Global
-          )
-          .then(() => {
-            f1(false);
-          });
-      } else {
-        updateConfig(config_ids.OPACITY, curValue,lastConfigObj).then(() => {
-          f1(true);
-        });
-      }
-    } else if (event.affectsConfiguration(config_ids.ZOOM_CIRCLE)) {
-      const curValue = configObj.get<number>(config_ids.ZOOM_CIRCLE);
-      if (!curValue) {
-        vscode.window.showErrorMessage(
-          `${config_ids.ZOOM_CIRCLE} settings an invalid value!`
-        );
-        configObj
-          // 改为用户原始的值
-          .update(
-            config_ids.ZOOM_CIRCLE,
-            lastConfigObj,
-            vscode.ConfigurationTarget.Global
-          )
-          .then(() => {
-            f1(false);
-          });
-      } else {
-        updateConfig(config_ids.ZOOM_CIRCLE, curValue,lastConfigObj).then(()=>{
-          f1(true);
-        })
-      }
-    } else if (event.affectsConfiguration(config_ids.ZOOM_SCALE)) {
-      const curValue = configObj.get<number>(config_ids.ZOOM_SCALE);
-      if (!curValue) {
-        vscode.window.showErrorMessage(
-          `${config_ids.ZOOM_SCALE} settings an invalid value!`
-        );
-        configObj
-          // 改为用户原始的值
-          .update(
-            config_ids.ZOOM_SCALE,
-            lastConfigObj,
-            vscode.ConfigurationTarget.Global
-          )
-          .then(() => {
-            f1(false);
-          });
-      } else {
-        updateConfig(config_ids.ZOOM_SCALE, curValue,lastConfigObj).then(()=>{
-          f1(true);
-        })
-      }
-    } else {
-      f1(true);
     }
   });
 }
@@ -1185,7 +1002,7 @@ async function checkEnabledAndTip(tip?: string) {
         )
         .then((res) => {
           if (res === "确定") {
-            vscode.commands.executeCommand(command_ids.ENABLE_EXT).then(() => {
+            enable().then(() => {
               f1(true);
             });
           } else {
@@ -1226,6 +1043,19 @@ function updateConfig(
   );
 }
 
+async function enable() {
+  if (!extEnabled()) {
+    updateConfig(config_ids.ENABLED, true);
+  } else {
+    return vscode.commands.executeCommand(command_ids.ENABLE_EXT);
+  }
+}
+
+async function disable() {
+  updateConfig(config_ids.ENABLED, false);
+
+}
+
 // 插件禁用之后，移除之前所有的内置操作
 export async function onDisable() {
   console.log("插件被禁用，开始执行还原操作。。。");
@@ -1233,21 +1063,14 @@ export async function onDisable() {
   if (!workbenchPath) {
     const appRoot = vscode.env.appRoot;
     workbenchPath = path.join(appRoot, "out", "vs", "workbench");
+    formatPath(workbenchPath);
   }
-  makePath(workbenchPath);
 
-  const data = fs.readFileSync(mainCSSOriPath);
+  const data = await fileRead(mainCSSOriPath);
 
-  const ws = fs.createWriteStream(mainCSSPath);
-  const res = await new Promise((f1, f2) => {
-    ws.write(data.toString(), (err) => {
-      if (err) {
-        vscode.window.showErrorMessage("遇到问题");
-        f2(false);
-      }
-      f1(true);
-    });
-  });
+  const res = await fileWrite(mainCSSPath, data).catch((err) =>
+    vscode.window.showErrorMessage(err.toString())
+  );
 
   if (!res) {
     return;
@@ -1256,27 +1079,33 @@ export async function onDisable() {
   for (const key of context.globalState.keys()) {
     context.globalState.update(key, undefined);
   }
-  vscode.workspace
-    .getConfiguration()
-    .update(config_ids.ENABLED, false, vscode.ConfigurationTarget.Global);
+  updateConfig(config_ids.ENABLED, false);
 
-  fs.renameSync(mainCSSOriPath, mainCSSRemovedPath);
 
-  fs.rmSync(innerDir, { recursive: true, force: true });
+  await fileRename(mainCSSOriPath, mainCSSRemovedPath);
+
+  await fileRemove(innerDir, { recursive: true, force: true });
+
   console.log("删除innerDir");
   // 用户目录不删除如果有用户的文件就不删除
 
-  const files = fs.readdirSync(userDir);
+
+  const files = await dirRead(userDir);
+
   if (files.length === 0) {
-    fs.rmSync(loaderDir, { recursive: true, force: true });
+
+    await fileRemove(loaderDir, { recursive: true, force: true });
+
     console.log("删除loaderDir");
+    vscode.window.showInformationMessage("壁纸加载器禁用成功，重启后生效。");
+    return;
   } else {
     console.log("不删除userDir");
+    vscode.window.showInformationMessage(
+      `壁纸加载器禁用成功，重启后生效。载入的壁纸文件还保留在${userDir}中哦。`
+    );
+    return;
   }
-
-  console.log("还原完成");
 }
 
 export function deactivate() {}
-
-//有一件事，就是比如我监听用户的更改，每次改一下就进行一下回调，每次回调都需要io操作，会比较慢的,但是如果用户改的太快，会回调多次，怎么做到就是让最后一次生效，
