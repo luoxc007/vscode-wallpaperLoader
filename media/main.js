@@ -1,7 +1,7 @@
 (function () {
   let selectedPath = null;
   const vscode = acquireVsCodeApi();
-  const wallpaperItems = document.querySelectorAll(".wallpaper-item");
+  const wallpaperItems = document.querySelectorAll(".usable");
   const contextMenu = document.getElementById("context-menu");
   const contextMenuBanned = document.getElementById("context-menu-banned");
 
@@ -12,20 +12,6 @@
     let timeout;
     item.addEventListener("click", (event) => {
       allContextMenuConceal();
-      // Webview中只能接收左键的click，也就是event.button只可能是0
-      //   if (event.button === 2) {
-      //     // 右键
-      //     vscode.postMessage({
-      //         type: "msg",
-      //         payload: "右键点击了",
-      //       });
-      //     event.preventDefault();
-      //     contextMenu.style.left = event.clientX + "px";
-      //     contextMenu.style.top = event.clientY + "px";
-      //     contextMenu.style.display = "block";
-      //     selectedPath = item.dataset.path;
-      //     return;
-      //   }
       clickCount++;
       if (clickCount === 1) {
         timeout = setTimeout(function () {
@@ -36,7 +22,7 @@
         clearTimeout(timeout);
         // 双击事件的处理逻辑
         vscode.postMessage({
-          type: "bgSelected",
+          type: "selected",
           payload: item.dataset.path,
         });
         clickCount = 0;
@@ -69,14 +55,14 @@
     if (event.target.id === "select") {
       if (selectedPath !== null) {
         vscode.postMessage({
-          type: "bgSelected",
+          type: "selected",
           payload: selectedPath,
         });
       }
     } else if (event.target.id === "ban") {
       if (selectedPath !== null) {
         vscode.postMessage({
-          type: "bgBanned",
+          type: "banned",
           payload: selectedPath,
         });
       }
@@ -87,18 +73,13 @@
   contextMenuBanned.addEventListener("click", (event) => {
     if (event.target.id === "startup") {
       vscode.postMessage({
-        type: "bgStartup",
+        type: "startup",
         payload: selectedPath,
       });
     } else if (event.target.id === "remove") {
       vscode.postMessage({
-        type: "bgRemoved",
+        type: "removed",
         payload: selectedPath,
-      });
-    } else {
-      vscode.postMessage({
-        type: "msg",
-        payload: "啥也没有",
       });
     }
     allContextMenuConceal();
