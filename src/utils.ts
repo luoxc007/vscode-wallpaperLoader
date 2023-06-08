@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import * as fs from "fs";
 import path = require("path");
 
@@ -34,6 +35,33 @@ export async function fileExisted(filename: string) {
   return new Promise<boolean>((f1, f2) => {
     fs.access(filename, (err) => {
       f1(err ? false : true);
+    });
+  });
+}
+
+export async function fileRead(filePath: string) {
+  return new Promise<Buffer>((f1, f2) => {
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        f2(err);
+      } else {
+        f1(data);
+      }
+    });
+  });
+}
+
+export async function fileWrite(
+  filePath: string,
+  data: string | NodeJS.ArrayBufferView
+) {
+  return new Promise<boolean>((f1, f2) => {
+    fs.writeFile(filePath, data, (err) => {
+      if (err) {
+        f2(err);
+      } else {
+        f1(true);
+      }
     });
   });
 }
@@ -76,12 +104,19 @@ export async function dirRead(dirPath: string) {
     });
   });
 }
-export async function fileRemove(filename: string) {
+export async function fileRemove(filename: string, options?: fs.RmOptions) {
   return new Promise((f1, f2) => {
-    fs.rm(filename, (err) => {
-      if (err) f2(err);
-      else f1(true);
-    });
+    if (options) {
+      fs.rm(filename, options, (err) => {
+        if (err) f2(err);
+        else f1(true);
+      });
+    } else {
+      fs.rm(filename, (err) => {
+        if (err) f2(err);
+        else f1(true);
+      });
+    }
   });
 }
 
@@ -128,7 +163,6 @@ export async function initDir(dirpath: string) {
   }
 }
 
-
 export function replaceAll(
   input: string,
   searchValue: string,
@@ -158,10 +192,12 @@ export function getDisplayFilename(filename: string) {
   const postFix = filename.substring(ptr);
   const postFixLength = filename.length - ptr;
 
-  const res = `${rawfilename.substring(0, maxLength - postFixLength)}~~~${postFix}`;
+  const res = `${rawfilename.substring(
+    0,
+    maxLength - postFixLength
+  )}~~~${postFix}`;
   return res;
 }
-
 
 export function shuffleArray<T>(array: T[]): T[] {
   const newArray = [...array]; // 创建一个新数组来保持原数组不变
@@ -172,4 +208,8 @@ export function shuffleArray<T>(array: T[]): T[] {
   }
 
   return newArray;
+}
+
+export function randomInArray<T>(arr: T[]) {
+  return arr[randomInt(arr.length)];
 }
