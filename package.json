@@ -1,0 +1,136 @@
+{
+  "name": "bg-loader",
+  "displayName": "bg-loader",
+  "description": "vscode background loader",
+  "version": "0.0.1",
+  "publisher": "luoxc007",
+  "repository": "https://github.com/Microsoft/vscode-extension-samples/helloworld-sample",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "title": "disable bg-loader(禁用壁纸加载器)",
+        "command": "BGLoader.disableExt",
+        "category": "bg-loader"
+      },
+      {
+        "title": "enable bg-loader(启用壁纸加载器)",
+        "command": "BGLoader.enableExt",
+        "category": "bg-loader"
+      },
+      {
+        "title": "setting background-image(设置壁纸加载器)",
+        "command": "BGLoader.configBGLoader",
+        "category": "bg-loader"
+      },
+      {
+        "title": "refresh bg-image(刷新壁纸)",
+        "command": "BGLoader.refreshBG",
+        "category": "bg-loader"
+      },
+      {
+        "title": "fix bg-image(固定壁纸)",
+        "command": "BGLoader.fixBG",
+        "category": "bg-loader"
+      },
+      {
+        "title": "open bg dir(打开壁纸文件夹)",
+        "command": "BGLoader.openUserDir",
+        "category": "bg-loader"
+      }
+    ],
+    "configuration": {
+      "title": "bg-loader",
+      "properties": {
+        "root.enabled": {
+          "title": "开启壁纸加速器",
+          "type": "boolean",
+          "default": true,
+          "description": "开启壁纸加速器",
+          "order": 0
+        },
+        "root.auto-refresh": {
+          "title": "重启后自动更换壁纸",
+          "type": "boolean",
+          "default": true,
+          "description": "重启后自动更换壁纸",
+          "order": 1
+        },
+        "profile.use-remove": {
+          "title": "移除壁纸后直接删除壁纸文件",
+          "type": "boolean",
+          "default": false,
+          "description": "移除壁纸后直接删除壁纸文件",
+          "order": 2
+        },
+        "style.opacity": {
+          "title": "工作区透明度",
+          "type": "number",
+          "default": 0.9,
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": 0,
+          "description": "工作区透明度[0-1]。太低会看不清代码，太高会看不清壁纸。",
+          "order": 3
+        },
+        "style.animation.use-zoom-animation": {
+          "title": "使用壁纸动态缩放",
+          "type": "boolean",
+          "default": false,
+          "description": "使用壁纸动态缩放。启用后壁纸会循环放大-缩小。",
+          "order": 4
+        },
+        "style.animation.zoom-circle": {
+          "title": "动态缩放周期",
+          "type": "number",
+          "default": 60,
+          "description": "壁纸动态缩放的循环周期（单位：秒）。",
+          "order": 5
+        },
+        "style.animation.zoom-scale": {
+          "title": "壁纸缩放比例",
+          "type": "number",
+          "default": 120,
+          "description": "壁纸缩放比例。默认是100，可以大于或者低于100，不太建议幅度过大。",
+          "order": 6
+        },
+        "style.animation.use-switch-animation":{
+          "title": "开启壁纸自动切换",
+          "type": "boolean",
+          "default": false,
+          "description": "开启后，壁纸定期会自动切换。慎重考虑下开启后会不会影响到你敲代码。",
+          "order": 7
+        },
+        "style.animation.switch-circle":{
+          "title": "壁纸自动切换周期",
+          "type": "number",
+          "default": 20,
+          "description": "每隔多少(单位:秒)切换一次壁纸，建议不要太频繁",
+          "order": 8
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "lint": "eslint \"src/**/*.ts\"",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.7",
+    "@types/vscode": "^1.73.0",
+    "@typescript-eslint/eslint-plugin": "^5.42.0",
+    "@typescript-eslint/parser": "^5.42.0",
+    "eslint": "^8.26.0",
+    "typescript": "^5.0.2"
+  }
+}
