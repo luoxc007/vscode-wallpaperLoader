@@ -16,11 +16,11 @@
 
 #### 壁纸外观预览
 
-<img src="https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/apperance.jpg" alt="外观一览" style="zoom:33%;" />
+![外观一览](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/apperance.jpg)
 
 
 
-<img src="https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/apperance2.jpg" alt="外观一览" style="zoom:33%;" />
+![外观一览](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/apperance2.jpg)
 
 
 
@@ -28,7 +28,7 @@
 
 安装插件后，在左下方状态栏可以看到 "壁纸加载器" 按钮，点击后看到以下选项：
 
-<img src="https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/open_config.jpg" alt="打开自定义目录" style="zoom:33%;" />
+![打开自定义目录](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/open_config.jpg)
 
 - 自定义壁纸
 
@@ -38,7 +38,7 @@
 
 如果不自定义，将会使用内置壁纸。打开壁纸文件夹，放入喜欢的壁纸图片，这些图片就会被自动加载。
 
-<img src="https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/user_dir.jpg" alt="自定义壁纸" style="zoom:33%;" />
+![自定义壁纸](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/user_dir.jpg)
 
 - 刷新壁纸
 
@@ -50,13 +50,13 @@
 
 双击以启用，右键有菜单提示
 
-<img src="https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/view_manager.jpg" alt="打开壁纸视图" style="zoom:33%;" />
+![打开壁纸视图](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/view_manager.jpg)
 
 - 打开加载器配置
 
 打开壁纸加载器的用户设置，内附有配置说明，不合规的改动一般不会成功。如果配置过后出现明显的bug，请联系作者，非常感谢您的反馈！
 
-<img src="https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/settings.jpg" alt="打开加载器配置" style="zoom:33%;" />
+![打开加载器配置](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/settings.jpg)
 
 特别说明：动画效果默认开启，如有不适可在配置处关闭
 
@@ -71,19 +71,4 @@
 ##### 如果不想该插件了，不要在商店disable，直接uninstall即可。
 
 
-
-
-
-
-
-## VS Code API
-
-### `vscode` module
-
-- [`commands.registerCommand`](https://code.visualstudio.com/api/references/vscode-api#commands.registerCommand)
-- [`window.showInformationMessage`](https://code.visualstudio.com/api/references/vscode-api#window.showInformationMessage)
-
-### Contribution Points
-
-- [`contributes.commands`](https://code.visualstudio.com/api/references/contribution-points#contributes.commands)
 
