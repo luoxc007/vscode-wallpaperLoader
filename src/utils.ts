@@ -1,5 +1,6 @@
 import { randomInt } from "crypto";
 import * as fs from "fs";
+import * as os from 'os';
 import path = require("path");
 
 export function getDirPath(filePath: string) {
@@ -213,3 +214,43 @@ export function shuffleArray<T>(array: T[]): T[] {
 export function randomInArray<T>(arr: T[]) {
   return arr[randomInt(arr.length)];
 }
+
+
+// platform
+function getRoamingDirectory(): string {
+  const platform = os.platform();
+  // const homeDir = process.env.HOME || process.env.USERPROFILE;
+  const homeDir = os.homedir()
+
+  if (platform === 'win32') {
+    return path.join(homeDir, 'AppData', 'Roaming');
+  }
+
+  if (platform === 'darwin') {
+    return path.join(homeDir, 'Library', 'Application Support');
+  }
+
+  if (platform === 'linux') {
+    return path.join(homeDir, '.config');
+  }
+
+  throw new Error('Unsupported platform');
+}
+
+
+// 节流
+export const withThrottle = (callback:any, delay:number = 1000) => {
+  let isThrottled = false;
+  function throttle() {
+    if (isThrottled) {
+      return;
+    }
+    isThrottled = true;
+    const timer = setTimeout(() => {
+      clearTimeout(timer)
+      callback();
+      isThrottled = false;
+    }, delay);
+  }
+  return throttle;
+};

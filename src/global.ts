@@ -7,6 +7,7 @@ const MEDIA_DIR = path.join(__filename, "..", "..", "media");
 const global_keys = {
   STYLE_UPDATE: "style-update",
   REMOVE_USED: "remove-used",
+  INITTED: "initted",
 };
 
 const config_ids = {
@@ -27,6 +28,7 @@ const command_ids = {
   CONFIG_LOADER: "wallpapaerLoader.config",
   REFRESH_PAPER: "wallpapaerLoader.refreshPaper",
   OPEN_USER_DIR: "wallpapaerLoader.openUserDir",
+  ON_USER_DIR_UPDATE:"wallpaperLoader.onUserDirUpdate"
 };
 
 const config_default = {
