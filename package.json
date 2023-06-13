@@ -2,7 +2,7 @@
   "name": "wallpaper-loader",
   "displayName": "WallPaperLoader",
   "description": "vscode wallpaper loader",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "luoxc007",
   "repository": "https://github.com/Microsoft/vscode-extension-samples/helloworld-sample",
   "engines": {

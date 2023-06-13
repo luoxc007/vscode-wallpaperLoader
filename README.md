@@ -10,6 +10,8 @@
 
 在vscode插件商店搜索"wallpaperloader"即可下载使用，作者为luoxc007。
 
+插件源码地址为:https://github.com/luoxc007/vscode-wallpaperLoader
+
 
 
 #### 使用说明
@@ -61,6 +63,10 @@
 若vscode出现黄色提示，说要重新安装，是正常现象，可不予理会。
 
 
+
+### 联系作者
+
+邮箱地址：buptfhxy@163.com
 
 
 
