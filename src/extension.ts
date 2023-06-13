@@ -33,6 +33,7 @@ import {
 } from "./utils";
 import { error } from "console";
 import { CommonPickItem, MultiStepInput } from "./multistepHelper";
+import * as os from "os";
 
 let workbenchPath: string | undefined;
 let appRoot: string;
@@ -63,6 +64,7 @@ let curMainEntity: MainEntity | null = null;
 
 // 禁用状态下只能做一个操作：启用
 let userDirWatcher: vscode.FileSystemWatcher | undefined;
+let extDirWatcher: vscode.FileSystemWatcher | undefined;
 
 export async function activate(_context: vscode.ExtensionContext) {
   // 启动配置
@@ -246,20 +248,32 @@ async function loaderMain() {
   userDirWatcher = vscode.workspace.createFileSystemWatcher(
     new vscode.RelativePattern(vscode.Uri.file(userDir), "*")
   );
-
   userDirWatcher.onDidCreate((e) => {
     vscode.commands.executeCommand(command_ids.ON_USER_DIR_UPDATE);
   });
-
   userDirWatcher.onDidChange((e) => {
     vscode.commands.executeCommand(command_ids.ON_USER_DIR_UPDATE);
   });
-
   userDirWatcher.onDidDelete((e) => {
     vscode.commands.executeCommand(command_ids.ON_USER_DIR_UPDATE);
   });
 
+  const extDir = path.join(__filename, "..", "..", "..");
+
+  extDirWatcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(vscode.Uri.file(extDir), "extensions.json")
+  );
+
+  extDirWatcher.onDidChange(async (e) => {
+    const content = await fileRead(path.join(extDir, "extensions.json"));
+    if (content.indexOf("luoxc007") === -1) {
+      await onDisable()
+      showInfoBeforeReload("检测到您卸载了该插件，重启将禁用壁纸，感谢您的使用，欢迎反馈，谢谢！")
+    }
+  });
+
   context.subscriptions.push(userDirWatcher);
+  context.subscriptions.push(extDirWatcher);
 
   curMainEntity = await readMain();
 
@@ -778,13 +792,15 @@ async function refreshMain(
   });
 }
 
-async function writeEmptyMain() {
-  return new Promise<boolean>(async (f1, f2) => {
-    const mainContent = `@import url("${mainCSSOriName}");`;
-    if (await fileWrite(mainCSSPath, mainContent).catch((err) => f2(err))) {
-      f1(true);
-    }
-  });
+function writeEmptyMain() {
+  // return new Promise<boolean>(async (f1, f2) => {
+  //   const mainContent = `@import url("${mainCSSOriName}");`;
+  //   if (await fileWrite(mainCSSPath, mainContent).catch((err) => f2(err))) {
+  //     f1(true);
+  //   }
+  // });
+  const mainContent = `@import url("${mainCSSOriName}");`;
+  fs.writeFileSync(mainCSSPath, mainContent);
 }
 
 function isNonSwitchPaper(
@@ -1142,14 +1158,10 @@ export async function onDisable() {
     formatPath();
   }
 
-  for (const key of context.globalState.keys()) {
-    context.globalState.update(key, undefined);
-  }
-
   // 设置init
   context.globalState.update(global_keys.INITTED, false);
 
-  const res = await writeEmptyMain();
+  writeEmptyMain();
 
   // avoid bugs.
   // const data = await fileRead(mainCSSOriPath);
@@ -1170,18 +1182,18 @@ export async function onDisable() {
     await fileRemove(loaderDir, { recursive: true, force: true });
     console.log("删除loaderDir");
     vscode.window.showInformationMessage("壁纸加载器禁用成功，重启后生效。");
-    return;
   } else {
     console.log("不删除userDir");
     vscode.window.showInformationMessage(
       `壁纸加载器禁用成功，重启后生效。载入的壁纸文件还保留在${userDir}中哦。`
     );
-    return;
+  }
+
+  for (const key of context.globalState.keys()) {
+    context.globalState.update(key, undefined);
   }
 }
 
-export function deactivate() {
-
-}
+export function deactivate() {}
 
 // vscode更新版本的时候，会刷掉workbench目录里面所有的文件
