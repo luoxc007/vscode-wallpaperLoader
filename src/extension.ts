@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
 import {
   global_keys,
   MEDIA_DIR,
@@ -46,7 +45,6 @@ const switchTip: string = "@keyframes switch";
 let mainCSSPath: string;
 let mainCSSBakPath: string;
 let mainCSSOriPath: string;
-// let mainCSSRemovedPath: string;
 
 let loaderDir: string;
 let userDir: string;
@@ -61,14 +59,11 @@ let context: vscode.ExtensionContext;
 let bakExisted: boolean;
 let oriExisted: boolean;
 
-// 用来控制回调是否生效
-// let loaderMainPromise: Promise<boolean> | undefined
 
-// 只有reloadWindow之后才会改
+
 let curMainEntity: MainEntity | null = null;
 
 // 禁用状态下只能做一个操作：启用
-
 let userDirWatcher: vscode.FileSystemWatcher | undefined;
 
 
@@ -183,28 +178,6 @@ export async function activate(_context: vscode.ExtensionContext) {
         updateConfigTimer = setTimeout(async () => {
           // 重新读取配置
 
-          // let curMain = await readCur();
-          // if (!isSwitchModel()) {
-          //   if (!curMain || !curMain.paperInfo) {
-          //     const availablePapers = await getAvailablePapers();
-          //     const selectedFile = randomInArray(availablePapers.files);
-          //     curMain = {
-          //       useSwitch: false,
-          //       paperInfo: {
-          //         isInner: availablePapers.isInner,
-          //         fileName: selectedFile,
-          //       },
-          //     };
-          //   }
-          // } else {
-          //   if (!curMain) {
-          //     curMain = { useSwitch: true };
-          //   }
-          // }
-          // const success = await writeMain(curMain);
-
-          // const success = await writeMain(curMain);
-
           const success = await refreshMain(curMainEntity);
 
           if (success) {
@@ -238,9 +211,6 @@ export async function activate(_context: vscode.ExtensionContext) {
               if (res === "确定") {
                 vscode.commands.executeCommand(command_ids.DISABLE_EXT);
               }
-              // else {
-              //   updateConfig(config_ids.ENABLED, true);
-              // }
             });
         }
       }
@@ -267,12 +237,6 @@ export async function activate(_context: vscode.ExtensionContext) {
 async function loaderMain() {
   // 查找vscode的位置
 
-  // const existedRemoved = await fileExisted(mainCSSRemovedPath);
-  // if (existedRemoved) {
-  // ensure(await fileRemove(mainCSSRemovedPath));
-  // ensure(await fileRename(mainCSSRemovedPath, mainCSSOriPath));
-
-  // }
 
   // 最重要的就是优先拷贝
   // write操作一定会一气呵成
@@ -283,24 +247,7 @@ async function loaderMain() {
   // 杜绝双重判断！
   if (!oriExisted) {
     // 没有初始化过插件，为了防止意外，不要重命名为备份，新建一个文件
-    // 这个方式可行
-
-    // if (bakExisted) {
-    //   ensure(await fileCopy(mainCSSBakPath, mainCSSOriPath));
-    // } else {
-    //   ensure(await fileCopy(mainCSSPath, mainCSSBakPath));
-    //   ensure(await fileCopy(mainCSSPath, mainCSSOriPath));
-    // }
-
     ensure(await fileCopy(mainCSSBakPath, mainCSSOriPath));
-    // await fileCopy(mainCSSPath, mainCSSOriPath);
-
-    // 以下不可行
-    // const rawMain = await fileRead(mainCSSPath);
-    // await fileWrite(mainCSSOriPath, rawMain);
-    // if(!bakExisted){
-    //   await fileWrite(mainCSSBakPath, rawMain);
-    // }
   }
 
   userDirWatcher = vscode.workspace.createFileSystemWatcher(
@@ -924,9 +871,6 @@ async function writeMain(
             }
             // switchDef
             {
-              // const prefix = `${loaderPrefix}/${
-              //   availablePapers.isInner ? "inner" : "user"
-              // }`;
               const isInner = availablePapers.isInner;
               const incre = Math.floor(100 / length);
               let curStep = 0;
@@ -959,119 +903,6 @@ async function writeMain(
   });
 }
 
-// async function writeMain(
-//   mainEntity: SingleEntity,
-//   configObj: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration()
-// ) {
-//   return new Promise<boolean>(async (f1, f2) => {
-//     let useSwitchAni = configObj.get<boolean>(config_ids.USE_SWITICH_ANIMATION);
-
-//     let useZoomAni = configObj.get<boolean>(config_ids.USE_ZOOM_ANIMATION);
-
-//     let relativePaperPath = "";
-//     if (!useSwitchAni) {
-//       relativePaperPath = getRelativeCSSPaperPath(mainEntity.paperInfo!);
-//       // 检查一下bgPath是否存在
-//       const realPath = path.join(workbenchPath!, relativePaperPath);
-//       if (!(await fileExisted(realPath))) {
-//         f2("壁纸文件不存在！");
-//         return;
-//       }
-//     }
-
-//     // 添加了switch相关
-//     let zoomDef = "";
-//     let switchDef = "";
-//     let animationTemplate = "";
-//     if (useZoomAni || useSwitchAni) {
-//       animationTemplate += "animation:";
-//       if (useZoomAni) {
-//         // animationTemplate
-//         {
-//           animationTemplate += `zoom ${configObj.get<number>(
-//             config_ids.ZOOM_CYCLE,
-//             config_default.ZOOM_CYCLE
-//           )}s infinite ease-in-out`;
-//           if (useSwitchAni) {
-//             animationTemplate += ",";
-//           } else {
-//             animationTemplate += ";";
-//           }
-//         }
-//         // zoomDef
-//         {
-//           zoomDef = `@keyframes zoom{0%{background-size:100%;}50%{background-size:${configObj.get<number>(
-//             config_ids.ZOOM_SCALE,
-//             config_default.ZOOM_SCALE
-//           )}%;}100%{background-size:100%;}}`;
-//         }
-//       }
-//       if (useSwitchAni) {
-//         {
-//           if (useSwitchAni) {
-//             const availablePapers = await getAvailablePapers();
-//             const length = availablePapers.files.length;
-//             // animationTemplate
-//             {
-//               let switchCycle = configObj.get<number>(
-//                 config_ids.SWITCH_CYCLE,
-//                 config_default.SWITCH_CYCLE
-//               );
-//               switchCycle = switchCycle * length;
-//               animationTemplate += `switch ${switchCycle}s infinite steps(1);`;
-//             }
-//             // switchDef
-//             {
-//               // const prefix = `${loaderPrefix}/${
-//               //   availablePapers.isInner ? "inner" : "user"
-//               // }`;
-//               const isInner = availablePapers.isInner;
-//               const incre = Math.floor(100 / length);
-//               let curStep = 0;
-//               switchDef = "@keyframes switch{";
-//               // 打乱
-//               const shuffledFiles = shuffleArray(availablePapers.files);
-//               for (const fileName of shuffledFiles) {
-//                 switchDef += `${curStep}%{background-image:url(${getRelativeCSSPaperPath(
-//                   { isInner, fileName }
-//                 )});}`;
-//                 curStep += incre;
-//               }
-//               switchDef += "}";
-
-//               if (
-//                 availablePapers.isInner &&
-//                 context.globalState.get<boolean>(global_keys.TIP_INNER, true)
-//               ) {
-//                 vscode.window
-//                   .showInformationMessage(
-//                     "当前正在使用内置壁纸，点击左下角壁纸加载器，打开壁纸文件夹即可自定义壁纸哦！",
-//                     "不再提示"
-//                   )
-//                   .then((res) => {
-//                     if (res === "不再提示") {
-//                       context.globalState.update(global_keys.TIP_INNER, false);
-//                     }
-//                   });
-//               }
-//             }
-//           }
-//         }
-//       }
-//     }
-//     // switch下，body里面就不要写background-image了，而且有特定的switchTip标识
-//     let mainContent = `@import url("${mainCSSOriName}");body{${
-//       useSwitchAni ? "" : `background-image:url(${relativePaperPath});`
-//     }background-repeat:no-repeat;background-position:center;background-size:cover;opacity:${configObj.get<number>(
-//       config_ids.OPACITY,
-//       config_default.OPACITY
-//     )};${animationTemplate}}${zoomDef}${switchDef}`;
-
-//     if (await fileWrite(mainCSSPath, mainContent).catch((err) => f2(err))) {
-//       f1(true);
-//     }
-//   });
-// }
 
 // 读取Main的实体
 type MainEntity = {
@@ -1141,10 +972,6 @@ function formatPath() {
   loaderDir = path.join(outPath, "loader");
   innerDir = path.join(loaderDir, "inner");
   userDir = path.join(loaderDir, "user");
-
-  // loaderDir = path.join(workbenchPath, "loader");
-  // innerDir = path.join(loaderDir, "inner");
-  // userDir = path.join(loaderDir, "user");
 
   mainCSSPath = path.join(workbenchPath!, mainCSSName);
   mainCSSBakPath = `${mainCSSPath}-bak`;
@@ -1217,7 +1044,6 @@ async function filePathCleanRemoved(realPath: string) {
 }
 
 function getRelativeCSSPaperPath(paperInfo: NonSwitchPaper) {
-  // return `loader/${paperInfo.isInner ? "inner" : "user"}/${paperInfo.fileName}`;
   return `../../../../../../loader/${paperInfo.isInner ? "inner" : "user"}/${
     paperInfo.file
   }`;
@@ -1333,12 +1159,11 @@ export async function onDisable() {
 
   const res = await writeEmptyMain();
 
+  // avoid bugs.
   // const data = await fileRead(mainCSSOriPath);
-
   // const res = await fileWrite(mainCSSPath, data).catch((err) =>
   //   vscode.window.showErrorMessage(err.toString())
   // );
-
   // if (!res) {
   //   return;
   // }
@@ -1362,53 +1187,6 @@ export async function onDisable() {
     return;
   }
 }
-
-// 插件禁用之后，移除之前所有的内置操作
-// export async function onDisable() {
-//   console.log("插件被禁用，开始执行还原操作。。。");
-
-//   if (!workbenchPath) {
-//     const appRoot = vscode.env.appRoot;
-//     workbenchPath = path.join(appRoot, "out", "vs", "workbench");
-//     formatPath();
-//   }
-
-//   const data = await fileRead(mainCSSOriPath);
-
-//   const res = await fileWrite(mainCSSPath, data).catch((err) =>
-//     vscode.window.showErrorMessage(err.toString())
-//   );
-
-//   if (!res) {
-//     return;
-//   }
-
-//   for (const key of context.globalState.keys()) {
-//     context.globalState.update(key, undefined);
-//   }
-
-//   await fileRename(mainCSSOriPath, mainCSSRemovedPath);
-
-//   await fileRemove(innerDir, { recursive: true, force: true });
-
-//   console.log("删除innerDir");
-//   // 用户目录不删除如果有用户的文件就不删除
-
-//   const files = await dirRead(userDir);
-
-//   if (files.length === 0) {
-//     await fileRemove(loaderDir, { recursive: true, force: true });
-//     console.log("删除loaderDir");
-//     vscode.window.showInformationMessage("壁纸加载器禁用成功，重启后生效。");
-//     return;
-//   } else {
-//     console.log("不删除userDir");
-//     vscode.window.showInformationMessage(
-//       `壁纸加载器禁用成功，重启后生效。载入的壁纸文件还保留在${userDir}中哦。`
-//     );
-//     return;
-//   }
-// }
 
 export function deactivate() {}
 
