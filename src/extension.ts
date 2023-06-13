@@ -73,6 +73,9 @@ let userDirWatcher: vscode.FileSystemWatcher | undefined;
 
 
 export async function activate(_context: vscode.ExtensionContext) {
+
+  // vscode.window.showInformationMessage("壁纸加载器被激活，感谢您的使用和支持！")
+
   // 启动配置
   if (!workbenchPath) {
     appRoot = vscode.env.appRoot;

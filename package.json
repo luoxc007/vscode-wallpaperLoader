@@ -17,7 +17,7 @@
   "activationEvents": [
     "onStartupFinished"
   ],
-  "icon": "media/wallpaper_loader_icon.jpg",
+  "icon": "media/wallpaper_loader_icon.png",
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
