@@ -59,18 +59,12 @@ let context: vscode.ExtensionContext;
 let bakExisted: boolean;
 let oriExisted: boolean;
 
-
-
 let curMainEntity: MainEntity | null = null;
 
 // 禁用状态下只能做一个操作：启用
 let userDirWatcher: vscode.FileSystemWatcher | undefined;
 
-
 export async function activate(_context: vscode.ExtensionContext) {
-
-  // vscode.window.showInformationMessage("壁纸加载器被激活，感谢您的使用和支持！")
-
   // 启动配置
   if (!workbenchPath) {
     appRoot = vscode.env.appRoot;
@@ -236,7 +230,6 @@ export async function activate(_context: vscode.ExtensionContext) {
 
 async function loaderMain() {
   // 查找vscode的位置
-
 
   // 最重要的就是优先拷贝
   // write操作一定会一气呵成
@@ -903,7 +896,6 @@ async function writeMain(
   });
 }
 
-
 // 读取Main的实体
 type MainEntity = {
   useSwitch: boolean;
@@ -1101,7 +1093,7 @@ function tipInner() {
     },
     context,
     "tipInner"
-  )()
+  )();
 }
 
 function isSwitchModel() {
