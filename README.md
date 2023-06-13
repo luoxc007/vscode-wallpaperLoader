@@ -64,10 +64,6 @@
 
 
 
-### 联系作者
-
-邮箱地址：buptfhxy@163.com
-
 
 
 ## VS Code API

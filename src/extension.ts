@@ -1180,6 +1180,8 @@ export async function onDisable() {
   }
 }
 
-export function deactivate() {}
+export function deactivate() {
+
+}
 
 // vscode更新版本的时候，会刷掉workbench目录里面所有的文件
