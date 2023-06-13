@@ -8,6 +8,7 @@ const global_keys = {
   STYLE_UPDATE: "style-update",
   REMOVE_USED: "remove-used",
   INITTED: "initted",
+  TIP_INNER:"tip-inner"
 };
 
 const config_ids = {

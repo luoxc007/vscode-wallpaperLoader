@@ -54,21 +54,21 @@
           "title": "开启壁纸加载器",
           "type": "boolean",
           "default": true,
-          "description": "开启壁纸加载器",
+          "description": "开启壁纸加载器。",
           "order": 0
         },
         "root.auto-refresh": {
           "title": "重启后自动更换壁纸",
           "type": "boolean",
           "default": true,
-          "description": "重启后自动更换壁纸",
+          "description": "重启后自动更换壁纸。",
           "order": 1
         },
         "profile.use-remove": {
           "title": "移除壁纸后直接删除壁纸文件",
           "type": "boolean",
           "default": false,
-          "description": "移除壁纸后直接删除壁纸文件",
+          "description": "移除壁纸后直接删除壁纸文件。",
           "order": 2
         },
         "style.opacity": {
@@ -91,14 +91,14 @@
           "title": "动态缩放周期",
           "type": "number",
           "default": 60,
-          "description": "壁纸动态缩放的循环周期，（单位：秒）",
+          "description": "壁纸动态缩放的循环周期。（单位：秒）",
           "order": 5
         },
         "style.animation.zoom-scale": {
           "title": "壁纸缩放比例",
           "type": "number",
           "default": 120,
-          "description": "壁纸缩放比例。默认是100，可以大于或者低于100，建议50-150之间",
+          "description": "壁纸缩放比例。默认是100，可以大于或者低于100，建议50-150之间。",
           "order": 6
         },
         "style.animation.use-switch-animation":{

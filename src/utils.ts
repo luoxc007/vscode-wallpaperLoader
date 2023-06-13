@@ -1,6 +1,7 @@
 import { randomInt } from "crypto";
 import * as fs from "fs";
-import * as os from 'os';
+import * as os from "os";
+import * as vscode from "vscode";
 import path = require("path");
 
 export function getDirPath(filePath: string) {
@@ -215,31 +216,29 @@ export function randomInArray<T>(arr: T[]) {
   return arr[randomInt(arr.length)];
 }
 
-
 // platform
 function getRoamingDirectory(): string {
   const platform = os.platform();
   // const homeDir = process.env.HOME || process.env.USERPROFILE;
-  const homeDir = os.homedir()
+  const homeDir = os.homedir();
 
-  if (platform === 'win32') {
-    return path.join(homeDir, 'AppData', 'Roaming');
+  if (platform === "win32") {
+    return path.join(homeDir, "AppData", "Roaming");
   }
 
-  if (platform === 'darwin') {
-    return path.join(homeDir, 'Library', 'Application Support');
+  if (platform === "darwin") {
+    return path.join(homeDir, "Library", "Application Support");
   }
 
-  if (platform === 'linux') {
-    return path.join(homeDir, '.config');
+  if (platform === "linux") {
+    return path.join(homeDir, ".config");
   }
 
-  throw new Error('Unsupported platform');
+  throw new Error("Unsupported platform");
 }
 
-
 // 节流
-export const withThrottle = (callback:any, delay:number = 1000) => {
+export const withThrottle = (callback: any, delay: number = 1000) => {
   let isThrottled = false;
   function throttle() {
     if (isThrottled) {
@@ -247,10 +246,55 @@ export const withThrottle = (callback:any, delay:number = 1000) => {
     }
     isThrottled = true;
     const timer = setTimeout(() => {
-      clearTimeout(timer)
+      clearTimeout(timer);
       callback();
       isThrottled = false;
     }, delay);
   }
   return throttle;
 };
+
+// globalState级时间节流
+// 按日期节流
+export const withThrottleByDay = (
+  callback: () => void,
+  context: vscode.ExtensionContext,
+  key: string
+) => {
+  return () => {
+    const currentDate = new Date().toISOString().slice(0, 10);
+    const lastRunDate = context.globalState.get<string>(key);
+
+    if (currentDate !== lastRunDate) {
+      // 当前日期与上次运行日期不同，执行回调并更新日期
+      callback();
+      context.globalState.update(key, currentDate);
+    }
+  };
+};
+
+export const withThrottleByHour = (
+  callback: () => void,
+  n: number = 1,
+  context: vscode.ExtensionContext,
+  key: string
+) => {
+  const nHoursInMilliseconds = n * 60 * 60 * 1000;
+
+  function throttle() {
+    const now = Date.now();
+    const lastRunTimestamp = context.globalState.get<number>(key);
+
+    if (!lastRunTimestamp || now - lastRunTimestamp >= nHoursInMilliseconds) {
+      // 没有存储的时间戳或超过指定小时数，执行回调并更新时间戳
+      callback();
+      context.globalState.update(key, now);
+    }
+  }
+
+  return throttle;
+};
+
+export function isOfType<T>(target: unknown, prop: keyof T): target is T {
+  return (target as T)[prop] !== undefined;
+}

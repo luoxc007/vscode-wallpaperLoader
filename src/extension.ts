@@ -29,6 +29,8 @@ import {
   replaceAll,
   shuffleArray,
   withThrottle,
+  isOfType,
+  withThrottleByDay,
 } from "./utils";
 import { error } from "console";
 import { CommonPickItem, MultiStepInput } from "./multistepHelper";
@@ -68,6 +70,7 @@ let curMainEntity: MainEntity | null = null;
 // 禁用状态下只能做一个操作：启用
 
 let userDirWatcher: vscode.FileSystemWatcher | undefined;
+
 
 export async function activate(_context: vscode.ExtensionContext) {
   // 启动配置
@@ -177,25 +180,30 @@ export async function activate(_context: vscode.ExtensionContext) {
         updateConfigTimer = setTimeout(async () => {
           // 重新读取配置
 
-          let curMain = await readCur();
-          if (!isSwitchModel()) {
-            if (!curMain || !curMain.paperInfo) {
-              const availablePapers = await getAvailablePapers();
-              const selectedFile = randomInArray(availablePapers.files);
-              curMain = {
-                useSwitch: false,
-                paperInfo: {
-                  isInner: availablePapers.isInner,
-                  fileName: selectedFile,
-                },
-              };
-            }
-          } else {
-            if (!curMain) {
-              curMain = { useSwitch: true };
-            }
-          }
-          const success = await writeMain(curMain);
+          // let curMain = await readCur();
+          // if (!isSwitchModel()) {
+          //   if (!curMain || !curMain.paperInfo) {
+          //     const availablePapers = await getAvailablePapers();
+          //     const selectedFile = randomInArray(availablePapers.files);
+          //     curMain = {
+          //       useSwitch: false,
+          //       paperInfo: {
+          //         isInner: availablePapers.isInner,
+          //         fileName: selectedFile,
+          //       },
+          //     };
+          //   }
+          // } else {
+          //   if (!curMain) {
+          //     curMain = { useSwitch: true };
+          //   }
+          // }
+          // const success = await writeMain(curMain);
+
+          // const success = await writeMain(curMain);
+
+          const success = await refreshMain(curMainEntity);
+
           if (success) {
             showInfoBeforeReload("修改后需要重启vscode,现在重启吗?");
           }
@@ -326,7 +334,8 @@ async function loaderMain() {
     if (
       !oriExisted ||
       configObj.get<boolean>(config_ids.AUTO_REFRESH, true) ||
-      context.globalState.get<boolean>(global_keys.STYLE_UPDATE)
+      context.globalState.get<boolean>(global_keys.STYLE_UPDATE) ||
+      !context.globalState.get(global_keys.INITTED, false)
     ) {
       await refreshMain(curMainEntity, configObj);
       context.globalState.update(global_keys.STYLE_UPDATE, false);
@@ -426,11 +435,8 @@ async function showLoaderView() {
             .then(async (res) => {
               if (res === "确定") {
                 await writeMain({
-                  useSwitch: false,
-                  paperInfo: {
-                    isInner: availablePapers.isInner,
-                    fileName: payload,
-                  },
+                  isInner: availablePapers.isInner,
+                  file: payload,
                 });
                 updateConfig(
                   config_ids.USE_SWITICH_ANIMATION,
@@ -441,8 +447,8 @@ async function showLoaderView() {
             });
         } else {
           await writeMain({
-            useSwitch: false,
-            paperInfo: { isInner: availablePapers.isInner, fileName: payload },
+            isInner: availablePapers.isInner,
+            file: payload,
           });
           reloadWindow();
         }
@@ -507,7 +513,7 @@ async function showLoaderView() {
 
         checkRemovedAndRefresh({
           isInner: availablePapers.isInner,
-          fileName: payload,
+          file: payload,
         });
 
         break;
@@ -533,7 +539,7 @@ async function showLoaderView() {
 
         checkRemovedAndRefresh({
           isInner: availablePapers.isInner,
-          fileName: payload,
+          file: payload,
         });
 
         break;
@@ -562,14 +568,14 @@ async function showLoaderView() {
 }
 
 // 当某个文件删除的时候，是否需要更改style
-async function checkRemovedAndRefresh(paperInfo: PaperInfo) {
+async function checkRemovedAndRefresh(paperInfo: NonSwitchPaper) {
   const mainEntity = await readMain();
   if (!mainEntity) return;
 
   if (
     !mainEntity.useSwitch &&
     mainEntity.paperInfo!.isInner === paperInfo.isInner &&
-    mainEntity.paperInfo!.fileName === paperInfo.fileName
+    mainEntity.paperInfo!.file === paperInfo.file
   ) {
     await refreshMain({ useSwitch: false, paperInfo });
   } else if (mainEntity.useSwitch) {
@@ -588,7 +594,7 @@ async function recover() {
   const mainEntity = await readCur();
 
   if (mainEntity && !mainEntity.useSwitch) {
-    return await writeMain(mainEntity);
+    return await writeMain(mainEntity.paperInfo!);
   }
 
   return true;
@@ -758,7 +764,21 @@ async function refreshMain(
 ) {
   return new Promise<boolean>(async (f1, f2) => {
     if (isSwitchModel()) {
-      f1(await writeMain({ useSwitch: true }));
+      const availablePapers = await getAvailablePapers();
+      f1(
+        await writeMain({
+          isInner: availablePapers.isInner,
+          files: availablePapers.files,
+        })
+      );
+
+      if (
+        availablePapers.isInner &&
+        context.globalState.get(global_keys.TIP_INNER, true)
+      ) {
+        tipInner();
+      }
+
       return;
     }
 
@@ -769,15 +789,19 @@ async function refreshMain(
       f1(
         await writeMain(
           {
-            useSwitch: false,
-            paperInfo: {
-              isInner: availablePapers.isInner,
-              fileName: selectedBG,
-            },
-          },
+            isInner: availablePapers.isInner,
+            file: selectedBG,
+          } as NonSwitchPaper,
+
           configObj
         )
       );
+      if (
+        availablePapers.isInner &&
+        context.globalState.get(global_keys.TIP_INNER, true)
+      ) {
+        tipInner();
+      }
       return;
     }
 
@@ -788,7 +812,7 @@ async function refreshMain(
       availablePapers.isInner === curMainEntity.paperInfo.isInner
     ) {
       availablePapers.files = availablePapers.files.filter(
-        (file) => file !== curMainEntity.paperInfo!.fileName
+        (file) => file !== curMainEntity.paperInfo!.file
       );
     }
 
@@ -796,15 +820,18 @@ async function refreshMain(
     f1(
       await writeMain(
         {
-          useSwitch: false,
-          paperInfo: {
-            isInner: availablePapers.isInner,
-            fileName: selectedFile,
-          },
+          isInner: availablePapers.isInner,
+          file: selectedFile,
         },
         configObj
       )
     );
+    if (
+      availablePapers.isInner &&
+      context.globalState.get(global_keys.TIP_INNER, true)
+    ) {
+      tipInner();
+    }
   });
 }
 
@@ -817,19 +844,32 @@ async function writeEmptyMain() {
   });
 }
 
-// 单纯写入mainEntity的内容或者被安排使用switch
+function isNonSwitchPaper(
+  entity: NonSwitchPaper | SwitchPaper
+): entity is NonSwitchPaper {
+  return isOfType<NonSwitchPaper>(entity, "file");
+}
+
+function isSwitchPaper(
+  entity: NonSwitchPaper | SwitchPaper
+): entity is SwitchPaper {
+  return isOfType<SwitchPaper>(entity, "files");
+}
+
+// 用PaperInfo和PapersInfo来区分是否使用switch
+// 不要在这里面判断是否是switch模式
 async function writeMain(
-  mainEntity: MainEntity,
+  paperInfo: NonSwitchPaper | SwitchPaper,
   configObj: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration()
 ) {
   return new Promise<boolean>(async (f1, f2) => {
-    let useSwitchAni = configObj.get<boolean>(config_ids.USE_SWITICH_ANIMATION);
+    let useSwitchAni = isSwitchPaper(paperInfo);
 
     let useZoomAni = configObj.get<boolean>(config_ids.USE_ZOOM_ANIMATION);
 
     let relativePaperPath = "";
     if (!useSwitchAni) {
-      relativePaperPath = getRelativeCSSPaperPath(mainEntity.paperInfo!);
+      relativePaperPath = getRelativeCSSPaperPath(paperInfo as NonSwitchPaper);
       // 检查一下bgPath是否存在
       const realPath = path.join(workbenchPath!, relativePaperPath);
       if (!(await fileExisted(realPath))) {
@@ -868,7 +908,7 @@ async function writeMain(
       if (useSwitchAni) {
         {
           if (useSwitchAni) {
-            const availablePapers = await getAvailablePapers();
+            const availablePapers = paperInfo as SwitchPaper;
             const length = availablePapers.files.length;
             // animationTemplate
             {
@@ -892,7 +932,7 @@ async function writeMain(
               const shuffledFiles = shuffleArray(availablePapers.files);
               for (const fileName of shuffledFiles) {
                 switchDef += `${curStep}%{background-image:url(${getRelativeCSSPaperPath(
-                  { isInner, fileName }
+                  { isInner, file: fileName }
                 )});}`;
                 curStep += incre;
               }
@@ -916,14 +956,134 @@ async function writeMain(
   });
 }
 
-type PaperInfo = {
-  isInner: boolean;
-  fileName: string;
-};
+// async function writeMain(
+//   mainEntity: SingleEntity,
+//   configObj: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration()
+// ) {
+//   return new Promise<boolean>(async (f1, f2) => {
+//     let useSwitchAni = configObj.get<boolean>(config_ids.USE_SWITICH_ANIMATION);
 
+//     let useZoomAni = configObj.get<boolean>(config_ids.USE_ZOOM_ANIMATION);
+
+//     let relativePaperPath = "";
+//     if (!useSwitchAni) {
+//       relativePaperPath = getRelativeCSSPaperPath(mainEntity.paperInfo!);
+//       // 检查一下bgPath是否存在
+//       const realPath = path.join(workbenchPath!, relativePaperPath);
+//       if (!(await fileExisted(realPath))) {
+//         f2("壁纸文件不存在！");
+//         return;
+//       }
+//     }
+
+//     // 添加了switch相关
+//     let zoomDef = "";
+//     let switchDef = "";
+//     let animationTemplate = "";
+//     if (useZoomAni || useSwitchAni) {
+//       animationTemplate += "animation:";
+//       if (useZoomAni) {
+//         // animationTemplate
+//         {
+//           animationTemplate += `zoom ${configObj.get<number>(
+//             config_ids.ZOOM_CYCLE,
+//             config_default.ZOOM_CYCLE
+//           )}s infinite ease-in-out`;
+//           if (useSwitchAni) {
+//             animationTemplate += ",";
+//           } else {
+//             animationTemplate += ";";
+//           }
+//         }
+//         // zoomDef
+//         {
+//           zoomDef = `@keyframes zoom{0%{background-size:100%;}50%{background-size:${configObj.get<number>(
+//             config_ids.ZOOM_SCALE,
+//             config_default.ZOOM_SCALE
+//           )}%;}100%{background-size:100%;}}`;
+//         }
+//       }
+//       if (useSwitchAni) {
+//         {
+//           if (useSwitchAni) {
+//             const availablePapers = await getAvailablePapers();
+//             const length = availablePapers.files.length;
+//             // animationTemplate
+//             {
+//               let switchCycle = configObj.get<number>(
+//                 config_ids.SWITCH_CYCLE,
+//                 config_default.SWITCH_CYCLE
+//               );
+//               switchCycle = switchCycle * length;
+//               animationTemplate += `switch ${switchCycle}s infinite steps(1);`;
+//             }
+//             // switchDef
+//             {
+//               // const prefix = `${loaderPrefix}/${
+//               //   availablePapers.isInner ? "inner" : "user"
+//               // }`;
+//               const isInner = availablePapers.isInner;
+//               const incre = Math.floor(100 / length);
+//               let curStep = 0;
+//               switchDef = "@keyframes switch{";
+//               // 打乱
+//               const shuffledFiles = shuffleArray(availablePapers.files);
+//               for (const fileName of shuffledFiles) {
+//                 switchDef += `${curStep}%{background-image:url(${getRelativeCSSPaperPath(
+//                   { isInner, fileName }
+//                 )});}`;
+//                 curStep += incre;
+//               }
+//               switchDef += "}";
+
+//               if (
+//                 availablePapers.isInner &&
+//                 context.globalState.get<boolean>(global_keys.TIP_INNER, true)
+//               ) {
+//                 vscode.window
+//                   .showInformationMessage(
+//                     "当前正在使用内置壁纸，点击左下角壁纸加载器，打开壁纸文件夹即可自定义壁纸哦！",
+//                     "不再提示"
+//                   )
+//                   .then((res) => {
+//                     if (res === "不再提示") {
+//                       context.globalState.update(global_keys.TIP_INNER, false);
+//                     }
+//                   });
+//               }
+//             }
+//           }
+//         }
+//       }
+//     }
+//     // switch下，body里面就不要写background-image了，而且有特定的switchTip标识
+//     let mainContent = `@import url("${mainCSSOriName}");body{${
+//       useSwitchAni ? "" : `background-image:url(${relativePaperPath});`
+//     }background-repeat:no-repeat;background-position:center;background-size:cover;opacity:${configObj.get<number>(
+//       config_ids.OPACITY,
+//       config_default.OPACITY
+//     )};${animationTemplate}}${zoomDef}${switchDef}`;
+
+//     if (await fileWrite(mainCSSPath, mainContent).catch((err) => f2(err))) {
+//       f1(true);
+//     }
+//   });
+// }
+
+// 读取Main的实体
 type MainEntity = {
   useSwitch: boolean;
-  paperInfo?: PaperInfo;
+  paperInfo?: NonSwitchPaper;
+};
+
+type NonSwitchPaper = {
+  isInner: boolean;
+  file: string;
+};
+
+type SwitchPaper = {
+  isInner: boolean;
+  files: string[];
 };
 
 // 读取当前应用的壁纸
@@ -968,7 +1128,7 @@ async function readMain() {
     useSwitch: false,
     paperInfo: {
       isInner: infoMatch[1] === "inner",
-      fileName: infoMatch[2],
+      file: infoMatch[2],
     },
   } as MainEntity;
 }
@@ -1053,10 +1213,10 @@ async function filePathCleanRemoved(realPath: string) {
   );
 }
 
-function getRelativeCSSPaperPath(paperInfo: PaperInfo) {
+function getRelativeCSSPaperPath(paperInfo: NonSwitchPaper) {
   // return `loader/${paperInfo.isInner ? "inner" : "user"}/${paperInfo.fileName}`;
   return `../../../../../../loader/${paperInfo.isInner ? "inner" : "user"}/${
-    paperInfo.fileName
+    paperInfo.file
   }`;
 }
 
@@ -1094,6 +1254,25 @@ async function checkEnabledAndTip(tip?: string) {
       f1(true);
     }
   });
+}
+
+function tipInner() {
+  withThrottleByDay(
+    () => {
+      vscode.window
+        .showInformationMessage(
+          "当前正在使用内置壁纸，点击左下角壁纸加载器，打开壁纸文件夹即可自定义壁纸哦！",
+          "不再提示"
+        )
+        .then((res) => {
+          if (res === "不再提示") {
+            context.globalState.update(global_keys.TIP_INNER, false);
+          }
+        });
+    },
+    context,
+    "tipInner"
+  )()
 }
 
 function isSwitchModel() {
@@ -1149,7 +1328,7 @@ export async function onDisable() {
   // 设置init
   context.globalState.update(global_keys.INITTED, false);
 
-  await writeEmptyMain();
+  const res = await writeEmptyMain();
 
   // const data = await fileRead(mainCSSOriPath);
 
