@@ -14,6 +14,14 @@
 
 
 
+#### 壁纸外观预览
+
+![外观一览](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/apperance1.jpg)
+
+
+
+![外观一览](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/apperance2.jpg)
+
 
 
 #### 使用说明
