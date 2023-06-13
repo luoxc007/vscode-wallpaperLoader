@@ -10,7 +10,7 @@
 
 安装插件后，在左下方状态栏可以看到 "壁纸加载器" 按钮，点击后看到以下选项：
 
-![打开自定义目录](./media/md_img/open_config.jpg)
+![打开自定义目录](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/open_config.jpg)
 
 - 自定义壁纸
 
@@ -20,7 +20,7 @@
 
 如果不自定义，将会使用内置壁纸
 
-![自定义壁纸](./media/md_img/user_dir.jpg)
+![自定义壁纸](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/user_dir.jpg)
 
 - 刷新壁纸
 
@@ -32,13 +32,13 @@
 
 双击以启用，右键有菜单提示
 
-![打开壁纸视图](./media/md_img/view_manager.jpg)
+![打开壁纸视图](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/view_manager.jpg)
 
 - 打开加载器配置
 
 打开壁纸加载器的用户设置，内附有配置说明，不合规的改动一般不会成功。如果配置过后出现明显的bug，请联系作者，非常感谢您的反馈！
 
-![打开加载器配置](./media/md_img/settings.jpg)
+![打开加载器配置](https://raw.githubusercontent.com/luoxc007/vscode-wallpaperLoader/main/media/md_img/settings.jpg)
 
 特别说明：动画效果默认开启，如有不适可在配置处关闭
 
