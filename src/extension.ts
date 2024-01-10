@@ -279,6 +279,7 @@ async function loaderMain() {
 
   // switch模式
   if (isSwitchModel()) {
+    // console.log("Switch模式启动");
     await refreshMain({ useSwitch: true });
 
     if (!context.globalState.get(global_keys.INITTED, false)) {
@@ -287,6 +288,7 @@ async function loaderMain() {
       });
     } else if (!oriExisted) reloadWindow();
   } else {
+    // console.log("Fix模式启动");
     const configObj = vscode.workspace.getConfiguration();
     if (
       !oriExisted ||
@@ -418,7 +420,7 @@ async function showLoaderView() {
           availablePapers.isInner ? innerDir : userDir,
           payload
         );
-        console.log("想要禁用的文件是：", realPath);
+        // console.log("想要禁用的文件是：", realPath);
 
         const removeUsed = context.globalState.get<boolean>(
           global_keys.REMOVE_USED,
@@ -502,7 +504,7 @@ async function showLoaderView() {
         break;
       }
       case "startup":
-        console.log(`重新启用:${payload}`);
+        // console.log(`重新启用:${payload}`);
 
         await filePathCleanRemoved(
           path.join(availablePapers.isInner ? innerDir : userDir, payload)
@@ -561,6 +563,7 @@ async function getAvailablePapers() {
   let files = await dirRead(userDir);
   if (!files || files.length === 0) {
     // 使用内置
+    // console.log("使用内置壁纸");
     await initInnerPapers();
     files = await dirRead(innerDir);
     const [bgFiles, removedFiles] = filterRemoved(files);
@@ -571,6 +574,7 @@ async function getAvailablePapers() {
     } as AvailablePapers;
   } else {
     const [bgFiles, removedFiles] = filterRemoved(files);
+    // console.log(`使用自定义壁纸，一共${bgFiles.length}张`);
     return {
       isInner: false,
       files: bgFiles,
@@ -772,17 +776,22 @@ async function refreshMain(
         (file) => file !== curMainEntity.paperInfo!.file
       );
     }
-
-    const selectedFile = randomInArray(availablePapers.files);
-    f1(
-      await writeMain(
-        {
-          isInner: availablePapers.isInner,
-          file: selectedFile,
-        },
-        configObj
-      )
-    );
+    
+    if(availablePapers.files.length!=0){
+      const selectedFile = randomInArray(availablePapers.files);
+      f1(
+        await writeMain(
+          {
+            isInner: availablePapers.isInner,
+            file: selectedFile,
+          },
+          configObj
+        )
+      );
+    }else{
+      f1(true);
+    }
+    
     if (
       availablePapers.isInner &&
       context.globalState.get(global_keys.TIP_INNER, true)
