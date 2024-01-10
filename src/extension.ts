@@ -213,6 +213,7 @@ export async function activate(_context: vscode.ExtensionContext) {
     })
   );
 
+  // 左下角状态栏
   const statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left
   );
@@ -227,7 +228,7 @@ export async function activate(_context: vscode.ExtensionContext) {
     await loaderMain();
   }
 
-  console.log("完成");
+  console.log("插件加载完成");
 }
 
 async function loaderMain() {
@@ -313,13 +314,13 @@ function configLoader() {
     let i = 0;
     const configObj = vscode.workspace.getConfiguration();
     const textItems = [
-      "自定义壁纸(打开用户壁纸文件夹)",
-      "刷新壁纸",
-      "打开壁纸视图",
-      "打开加载器配置",
+      "自定义壁纸 - 添加壁纸到该文件夹即可 - Just Add your wallpaper into it!",
+      "刷新壁纸 - Refresh Wallpaper",
+      "打开壁纸视图 - Open Wallpaper View",
+      "打开加载器配置页 - Open Settings page",
       configObj.get<boolean>(config_ids.ENABLED)
-        ? "禁用壁纸加载器"
-        : "启用壁纸加载器",
+        ? "禁用壁纸加载器 - Disable Wallpaper-Loader"
+        : "启用壁纸加载器 - Enable Wallpaper-Loader",
     ];
 
     const items: CommonPickItem[] = textItems.map((label) => ({

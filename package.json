@@ -4,7 +4,7 @@
   "description": "vscode wallpaper loader",
   "version": "0.1.3",
   "publisher": "luoxc007",
-  "repository": "https://github.com/Microsoft/vscode-extension-samples/helloworld-sample",
+  "repository": "https://github.com/luoxc007/vscode-wallpaperLoader",
   "engines": {
     "vscode": "^1.73.0"
   },
@@ -20,29 +20,55 @@
   "icon": "media/wallpaper_loader_icon.png",
   "main": "./out/extension.js",
   "contributes": {
+    "menus":{
+      "editor/context": [
+        {
+          "when": "true",
+          "command": "wallpapaerLoader.config",
+          "alt": "wallpapaerLoader.config",
+          "group": "z_wallpaper-loader"
+        }
+      ],
+      "explorer/context": [
+        {
+          "when": "true",
+          "command": "wallpapaerLoader.config",
+          "alt": "wallpapaerLoader.config",
+          "group": "z_wallpaper-loader"
+        }
+      ],
+      "commandPalette":[
+        {
+          "when": "true",
+          "command": "wallpapaerLoader.config",
+          "alt": "wallpapaerLoader.config",
+          "group": "z_wallpaper-loader"
+        }
+      ]
+    },
     "commands": [
       {
-        "title": "disable wallpaper-loader(禁用壁纸加载器)",
+        "title": "Disable Wallpaper-Loader(禁用壁纸)",
         "command": "wallpapaerLoader.disableExt",
         "category": "wallpaper-loader"
       },
       {
-        "title": "enable wallpaper-loader(启用壁纸加载器)",
+        "title": "Enable Wallpaper-Loader(启用壁纸)",
         "command": "wallpapaerLoader.enableExt",
         "category": "wallpaper-loader"
       },
       {
-        "title": "config wallpaper-loader(设置壁纸加载器)",
+        "title": "Config Wallpaper-Loader(设置壁纸)",
         "command": "wallpapaerLoader.config",
         "category": "wallpaper-loader"
       },
       {
-        "title": "refresh wallpaper(刷新壁纸)",
+        "title": "Refresh Wallpaper(刷新壁纸)",
         "command": "wallpapaerLoader.refreshPaper",
         "category": "wallpaper-loader"
       },
       {
-        "title": "open wallpaper dir(打开壁纸文件夹)",
+        "title": "Open Wallpaper Directory(打开壁纸文件夹)",
         "command": "wallpapaerLoader.openUserDir",
         "category": "wallpaper-loader"
       }
@@ -51,68 +77,68 @@
       "title": "wallpaper-loader",
       "properties": {
         "root.enabled": {
-          "title": "开启壁纸加载器",
+          "title": "开启壁纸加载器\nOpen Wallpaper Loader.",
           "type": "boolean",
           "default": true,
-          "description": "开启壁纸加载器。",
+          "description": "(*) 开启壁纸加载器。\nOpen Wallpaper Loader.",
           "order": 0
         },
         "root.auto-refresh": {
-          "title": "重启后自动更换壁纸",
+          "title": "重启后自动更换壁纸\nAuto Refrsh wallpaper after editor reloaded.",
           "type": "boolean",
           "default": true,
-          "description": "重启后自动更换壁纸。",
+          "description": "(*) 重启后自动更换壁纸。\nAuto Refrsh wallpaper after editor reloaded.",
           "order": 1
         },
         "profile.use-remove": {
-          "title": "移除壁纸后直接删除壁纸文件",
+          "title": "移除壁纸后直接删除壁纸文件\nDelete the wallpaper file directly after removing the wallpaper.",
           "type": "boolean",
           "default": false,
-          "description": "移除壁纸后直接删除壁纸文件。",
+          "description": "移除壁纸后直接删除壁纸文件。\nDelete the wallpaper file directly after removing the wallpaper.",
           "order": 2
         },
         "style.opacity": {
-          "title": "工作区透明度",
+          "title": "工作区透明度\nWorkspace Opacity",
           "type": "number",
           "default": 0.9,
           "exclusiveMaximum": 1,
           "exclusiveMinimum": 0,
-          "description": "工作区透明度[0-1]。太低会看不清代码，太高会看不清壁纸。",
+          "description": "工作区透明度[0-1]。太低会看不清代码，太高会看不清壁纸。\nWorkspace Opacity [0-1]. If it is too low, you will not be able to see the code clearly; if it is too high, you will not be able to see the wallpaper clearly.",
           "order": 3
         },
         "style.animation.use-zoom-animation": {
-          "title": "使用壁纸动态缩放",
+          "title": "开启壁纸动态缩放\nEnable wallpaper dynamic scaling",
           "type": "boolean",
           "default": false,
-          "description": "使用壁纸动态缩放。启用后壁纸会循环放大-缩小。",
+          "description": "(*) 使用壁纸动态缩放。启用后壁纸会循环放大-缩小。\nUse wallpapers to dynamically zoom. When enabled, the wallpaper will cycle between zooming in and out.",
           "order": 4
         },
         "style.animation.zoom-cycle": {
-          "title": "动态缩放周期",
+          "title": "动态缩放周期\nDynamic scaling cycle",
           "type": "number",
           "default": 60,
-          "description": "壁纸动态缩放的循环周期。（单位：秒）",
+          "description": "壁纸动态缩放的循环周期。（单位：秒）\nWallpaper dynamic scaling cycle. (Unit: seconds)",
           "order": 5
         },
         "style.animation.zoom-scale": {
-          "title": "壁纸缩放比例",
+          "title": "壁纸缩放比例\nWallpaper scaling",
           "type": "number",
           "default": 120,
-          "description": "壁纸缩放比例。默认是100，可以大于或者低于100，建议50-150之间。",
+          "description": "壁纸缩放比例。默认是100，可以大于或者低于100，建议50-150之间。\nWallpaper scaling. The default is 100, which can be greater or less than 100. It is recommended to be between 50-150.",
           "order": 6
         },
         "style.animation.use-switch-animation":{
-          "title": "开启壁纸自动切换",
+          "title": "开启壁纸自动切换\nTurn on auto wallpaper switching",
           "type": "boolean",
           "default": false,
-          "description": "定时刷新模式。开启后，壁纸定期会自动切换。慎重考虑下开启后会不会影响到你的工作效率。",
+          "description": "(*) 定时刷新模式。开启后，壁纸定期会自动切换。慎重考虑下开启后会不会影响到你的工作效率。\nScheduled refresh mode. When turned on, the wallpaper will auto switch periodically. Carefully consider whether turning it on will affect your work efficiency.",
           "order": 7
         },
         "style.animation.switch-cycle":{
-          "title": "壁纸自动切换周期",
+          "title": "壁纸自动切换周期\nWallpaper auto switching cycle",
           "type": "number",
           "default": 20,
-          "description": "每隔多少(单位:秒)切换一次壁纸，建议不要太小，会刷新得非常频繁。",
+          "description": "每隔多少(单位:秒)切换一次壁纸，建议不要太小，会刷新得非常频繁。\nHow often (unit: seconds) to switch the wallpaper, it is recommended not to be too small, as it will be refreshed very frequently.",
           "order": 8
         }
       }
